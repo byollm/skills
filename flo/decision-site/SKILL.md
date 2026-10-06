@@ -26,21 +26,32 @@ dependencies, works from `file://`). Structure:
 The file contains three sections behind a sticky nav:
 
 1. **Decisions** — one card per open decision. Each card shows the question,
-   the options (the PRD's proposed default is tagged "proposed"), and an
+   the options (the PRD's proposed default is tagged "proposed"), an
+   **"Other…" freeform option** with a text input for a custom answer, and an
    OPEN/DECIDED status. Clicking an option decides it. "Accept all proposed
    defaults" and "Reset" buttons. A progress counter (n/total decided).
+   An empty freeform answer counts as OPEN and falls back to the proposed
+   default in the prompt (flagged in the NOTE line).
 2. **Mockups** — one mock per flow/screen in the source doc. Each mock is a
    card with a title bar (file/screen it belongs to), a visual rendering of
    the screen, and a **comment box** (name + text, appends timestamped
    comments below the mock). Mockups have a **select for prompt** toggle:
    the generated prompt only includes the selected mocks (all selected by
-   default).
+   default). Submitted comments on selected mocks are included in the prompt
+   as indented bullets under the mock.
 3. **Prompt** — a button that generates the prompt via JavaScript from the
    current state: verified facts (if the source doc has them), every decision
-   (decided value, or "OPEN — use proposed default"), the selected mockups
-   with their comments, scope, and constraints. Output is a textarea with a
-   Copy button. The prompt must be concise — decisions as one-liners,
-   comments as bullets, no prose padding.
+   (decided value, freeform text, or "OPEN — use proposed default"), the
+   selected mockups with their comments, scope, and constraints. Output is a
+   textarea with a Copy button. The prompt must be concise — decisions as
+   one-liners, comments as bullets, no prose padding.
+
+**Persistence (required).** All state — decisions, freeform text, submitted
+comments, unsubmitted comment drafts, and mock selection — is saved to
+`localStorage` on every change and restored on load. Nothing is lost when
+navigating between tabs, re-rendering, or reloading the page. Unsubmitted
+drafts survive re-renders because `renderMocks()` restores draft values into
+the form inputs. Key: `decision-site:<SOURCE_DOC>`.
 
 ## Design requirements (the "killer" part)
 
@@ -77,7 +88,11 @@ and note it in the site header.
 1. Read the source doc fully. List decisions, facts, flows, constraints.
 2. Write the HTML file: skeleton + CSS first, then sections, then the
   DECISIONS/MOCKS data + render/prompt logic in vanilla JS.
-3. Syntax-check the embedded JS (extract `<script>` and `new Function(...)`).
+3. Run the functional test harness against the generated file's engine
+   (see test.mjs — freeform, draft persistence, comment-to-prompt, reload
+   persistence, reset). At minimum: syntax-check the embedded JS
+   (extract `<script>` and `new Function(...)`) and verify a submitted
+   comment appears in the generated prompt.
 4. Open the file in the browser for the operator.
 5. Tell the operator: walk Decisions, review Mockups (comment + select), then
   Generate → Copy.

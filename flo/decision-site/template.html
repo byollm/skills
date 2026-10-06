@@ -80,6 +80,9 @@
   .cform input { width: 120px; }
   .cform textarea { flex: 1; min-height: 34px; resize: vertical; font-family: inherit; }
   .check { color: var(--ok); }
+  .freeinput { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--text); padding: 7px 12px; font-size: 13.5px; min-width: 220px; }
+  .freeinput:focus { outline: none; border-color: var(--accent); }
   .tag { font-size: 11px; font-family: var(--mono); border-radius: 4px; padding: 1px 6px; }
   .tag.pub { color: var(--ok); border: 1px solid #238636; }
   .tag.priv { color: var(--warn); border: 1px solid #9e6a03; }
@@ -131,8 +134,8 @@
    DATA — filled in per grilling session.
    DECISIONS: { id, q, opts: [...], def: index of proposed default }
    MOCKS:    { id, title, screen, selected: bool, html: string }
-   FACTS:    [strings] — verified facts, go into the prompt verbatim
-   SCOPE / CONSTRAINTS / DELIVERABLES: [strings]
+   FACTS / SCOPE / CONSTRAINTS / DELIVERABLES: [strings]
+   TASK / SOURCE_DOC: strings
    ====================================================================== */
 const DECISIONS = [];
 const MOCKS = [];
@@ -143,52 +146,90 @@ const DELIVERABLES = [];
 const TASK = "";
 const SOURCE_DOC = "";
 
-const state = {};   // decision id -> chosen index
-const comments = {}; // mock id -> [{who, text, when}]
+/* ---------- persistent state (survives re-render AND page reload) ------ */
+const STORE_KEY = "decision-site:" + (SOURCE_DOC || location.pathname);
+let state = {};      // decision id -> chosen index, or "free"
+let freeform = {};   // decision id -> freeform text
+let comments = {};   // mock id -> [{who, text, when}]
+let drafts = {};     // mock id -> {who, text} unsubmitted comment drafts
+let mockSel = {};    // mock id -> selected bool (overrides MOCKS default)
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+    state = s.state || {}; freeform = s.freeform || {};
+    comments = s.comments || {}; drafts = s.drafts || {};
+    mockSel = s.mockSel || {};
+  } catch (e) { /* fresh */ }
+}
+function saveState() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(
+      { state, freeform, comments, drafts, mockSel }));
+  } catch (e) { /* private mode etc. */ }
+}
 
 /* ---------- decisions ---------- */
 function render() {
   document.getElementById("cards").innerHTML = DECISIONS.map(d => {
     const chosen = state[d.id];
+    const isFree = chosen === "free";
     const opts = d.opts.map((o, i) =>
       `<span class="opt ${chosen === i ? "sel" : ""} ${i === d.def ? "proposed" : ""}"
-        onclick="decide('${d.id}',${i})">${o}</span>`).join("");
-    const st = chosen === undefined
-      ? `<div class="status open">OPEN — proposed default not yet accepted</div>`
-      : `<div class="status decided">DECIDED${chosen === d.def ? " (proposed default accepted)" : " (differs from proposal)"}</div>`;
-    return `<div class="card"><div class="q"><span class="id">${d.id}</span>${d.q}</div>
-      <div class="opts">${opts}</div>${st}</div>`;
+        onclick="decide('${d.id}',${i})">${esc(o)}</span>`).join("");
+    const free = `<span class="opt ${isFree ? "sel" : ""}" onclick="decideFree('${d.id}')">Other…</span>
+      <input class="freeinput" id="free-${d.id}" placeholder="write your own answer"
+        value="${esc(freeform[d.id] || "")}" oninput="freeInput('${d.id}', this.value)">`;
+    let st;
+    if (chosen === undefined) st = `<div class="status open">OPEN — proposed default not yet accepted</div>`;
+    else if (isFree) st = `<div class="status decided">DECIDED (freeform${freeform[d.id] ? "" : " — empty, will fall back to proposed default"})</div>`;
+    else st = `<div class="status decided">DECIDED${chosen === d.def ? " (proposed default accepted)" : " (differs from proposal)"}</div>`;
+    return `<div class="card"><div class="q"><span class="id">${d.id}</span>${esc(d.q)}</div>
+      <div class="opts">${opts}${free}</div>${st}</div>`;
   }).join("");
   document.getElementById("progress").textContent =
     `— ${Object.keys(state).length}/${DECISIONS.length} decided.`;
 }
-function decide(id, i) { state[id] = i; render(); }
-function acceptAllProposed() { DECISIONS.forEach(d => state[d.id] = d.def); render(); }
-function resetAll() { Object.keys(state).forEach(k => delete state[k]); render(); }
+function decide(id, i) { state[id] = i; saveState(); render(); }
+function decideFree(id) { state[id] = "free"; saveState(); render();
+  const el = document.getElementById("free-" + id); if (el) el.focus(); }
+function freeInput(id, v) { freeform[id] = v; saveState(); }
+function acceptAllProposed() { DECISIONS.forEach(d => state[d.id] = d.def); saveState(); render(); }
+function resetAll() { state = {}; freeform = {}; comments = {}; drafts = {}; mockSel = {};
+  saveState(); render(); renderMocks(); }
 
 /* ---------- mockups ---------- */
 function renderMocks() {
   document.getElementById("mocks").innerHTML = MOCKS.map(m => {
+    const sel = mockSel[m.id] !== undefined ? mockSel[m.id] : m.selected;
     const cs = (comments[m.id] || []).map(c =>
-      `<div class="comment"><span class="who">${esc(c.who)}</span><span class="when">${c.when}</span><br>${esc(c.text)}</div>`).join("");
-    return `<div class="mock ${m.selected ? "selected" : ""}" id="mock-${m.id}">
-      <div class="bar"><span>${m.title}</span><span style="opacity:.6">${m.screen}</span>
-        <span class="sel-toggle" onclick="toggleMock('${m.id}')">${m.selected ? "✓ in prompt" : "＋ include in prompt"}</span></div>
+      `<div class="comment"><span class="who">${esc(c.who)}</span><span class="when">${esc(c.when)}</span><br>${esc(c.text)}</div>`).join("");
+    const dr = drafts[m.id] || {};
+    return `<div class="mock ${sel ? "selected" : ""}" id="mock-${m.id}">
+      <div class="bar"><span>${esc(m.title)}</span><span style="opacity:.6">${esc(m.screen)}</span>
+        <span class="sel-toggle" onclick="toggleMock('${m.id}')">${sel ? "✓ in prompt" : "＋ include in prompt"}</span></div>
       <div class="body">${m.html}</div>
       <div class="comments">${cs}
         <div class="cform">
-          <input id="cname-${m.id}" placeholder="name">
-          <textarea id="ctext-${m.id}" placeholder="Comment on this screen…"></textarea>
+          <input id="cname-${m.id}" placeholder="name" value="${esc(dr.who || "")}"
+            oninput="draftInput('${m.id}','who',this.value)">
+          <textarea id="ctext-${m.id}" placeholder="Comment on this screen…"
+            oninput="draftInput('${m.id}','text',this.value)">${esc(dr.text || "")}</textarea>
           <button class="btn" onclick="addComment('${m.id}')">Comment</button>
         </div>
       </div>
     </div>`;
   }).join("");
   document.getElementById("mockProgress").textContent =
-    `— ${MOCKS.filter(m => m.selected).length}/${MOCKS.length} selected for prompt.`;
+    `— ${MOCKS.filter(m => mockSelected(m.id)).length}/${MOCKS.length} selected for prompt.`;
 }
-function toggleMock(id) {
-  const m = MOCKS.find(x => x.id === id); m.selected = !m.selected; renderMocks();
+function mockSelected(id) {
+  const m = MOCKS.find(x => x.id === id);
+  return mockSel[id] !== undefined ? mockSel[id] : m.selected;
+}
+function toggleMock(id) { mockSel[id] = !mockSelected(id); saveState(); renderMocks(); }
+function draftInput(id, field, v) {
+  (drafts[id] = drafts[id] || {})[field] = v; saveState();
 }
 function addComment(id) {
   const who = document.getElementById("cname-" + id).value.trim() || "anon";
@@ -196,14 +237,25 @@ function addComment(id) {
   if (!text) return;
   (comments[id] = comments[id] || []).push(
     { who, text, when: new Date().toLocaleString() });
-  renderMocks();
+  delete drafts[id];
+  saveState(); renderMocks();
 }
-function esc(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
 /* ---------- prompt ---------- */
+function decisionValue(d) {
+  const chosen = state[d.id];
+  if (chosen === undefined) return "OPEN — use proposed default";
+  if (chosen === "free") {
+    const t = (freeform[d.id] || "").trim();
+    return t || "OPEN — use proposed default (freeform left empty)";
+  }
+  return d.opts[chosen];
+}
 function genPrompt() {
-  const open = DECISIONS.filter(d => state[d.id] === undefined);
-  const sel = MOCKS.filter(m => m.selected);
+  const open = DECISIONS.filter(d => state[d.id] === undefined ||
+    (state[d.id] === "free" && !(freeform[d.id] || "").trim()));
+  const sel = MOCKS.filter(m => mockSelected(m.id));
   const L = [];
   L.push(`${TASK} per ${SOURCE_DOC} (read it first — it is the source of truth).`);
   L.push("");
@@ -213,10 +265,7 @@ function genPrompt() {
     L.push("");
   }
   L.push("DECISIONS (from the grilling session):");
-  DECISIONS.forEach(d => {
-    const v = state[d.id] === undefined ? "OPEN — use proposed default" : d.opts[state[d.id]];
-    L.push(`- ${d.id}: ${v}`);
-  });
+  DECISIONS.forEach(d => L.push(`- ${d.id}: ${decisionValue(d)}`));
   L.push("");
   if (sel.length) {
     L.push("MOCKUPS TO BUILD (selected):");
@@ -250,6 +299,7 @@ document.querySelectorAll("nav a").forEach(a => {
   });
 });
 
+loadState();
 render();
 renderMocks();
 </script>
