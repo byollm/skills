@@ -253,6 +253,17 @@ function decisionValue(d) {
   return d.opts[chosen];
 }
 function genPrompt() {
+  // Fold any unsubmitted comment drafts into comments so nothing typed is lost.
+  MOCKS.forEach(m => {
+    const dr = drafts[m.id];
+    if (dr && (dr.text || "").trim()) {
+      (comments[m.id] = comments[m.id] || []).push(
+        { who: (dr.who || "").trim() || "anon", text: dr.text.trim(),
+          when: new Date().toLocaleString() });
+      delete drafts[m.id];
+    }
+  });
+  saveState(); renderMocks();
   const open = DECISIONS.filter(d => state[d.id] === undefined ||
     (state[d.id] === "free" && !(freeform[d.id] || "").trim()));
   const sel = MOCKS.filter(m => mockSelected(m.id));

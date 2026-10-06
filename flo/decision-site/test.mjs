@@ -54,7 +54,14 @@ vm.runInContext('freeInput("G1",""); genPrompt();', r2.ctx);
 const out2 = vm.runInContext('document.getElementById("out").value', r2.ctx);
 t('empty freeform flagged open', out2.includes('G1: OPEN') && out2.includes('1 decision(s) still open'));
 
-// 6. reset clears everything
+// 6. unsubmitted draft reaches the prompt when generated
+const r3 = makeCtx(store);
+vm.runInContext('draftInput("m1","who","zoe"); draftInput("m1","text","never clicked comment"); genPrompt();', r3.ctx);
+const out3 = vm.runInContext('document.getElementById("out").value', r3.ctx);
+t('draft folded into prompt', out3.includes('zoe: never clicked comment'));
+t('draft cleared after folding', vm.runInContext('drafts["m1"]', r3.ctx) === undefined);
+
+// 7. reset clears everything
 vm.runInContext('resetAll();', r2.ctx);
 t('reset clears state', vm.runInContext('Object.keys(state).length', r2.ctx) === 0);
 
