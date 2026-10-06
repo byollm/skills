@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><!-- TITLE -->Grilling Session</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2129; --line: #30363d;
+    --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff; --ok: #3fb950;
+    --warn: #d29922; --bad: #f85149; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { padding: 28px 32px 20px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #10151c, var(--bg)); }
+  header h1 { margin: 0 0 6px; font-size: 22px; }
+  header h1 .brand { color: var(--accent); }
+  header p { margin: 0; color: var(--dim); max-width: 72ch; }
+  .meta { margin-top: 10px; font-size: 12.5px; color: var(--dim); font-family: var(--mono); }
+  nav { position: sticky; top: 0; z-index: 10; background: rgba(13,17,23,.92);
+    backdrop-filter: blur(6px); border-bottom: 1px solid var(--line);
+    display: flex; gap: 4px; padding: 0 24px; overflow-x: auto; }
+  nav a { padding: 10px 14px; color: var(--dim); text-decoration: none; font-size: 13.5px;
+    border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer; }
+  nav a:hover { color: var(--text); }
+  nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+  main { max-width: 1060px; margin: 0 auto; padding: 28px 32px 80px; }
+  section { display: none; }
+  section.show { display: block; }
+  h2 { font-size: 18px; margin: 8px 0 16px; }
+  h3 { font-size: 15px; margin: 24px 0 8px; color: var(--accent); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px 18px; margin-bottom: 14px; }
+  .card .q { font-weight: 600; margin-bottom: 8px; }
+  .card .q .id { color: var(--accent); font-family: var(--mono); font-size: 13px; margin-right: 8px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opt { border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer;
+    font-size: 13.5px; color: var(--dim); background: var(--panel2); user-select: none; }
+  .opt:hover { border-color: var(--dim); color: var(--text); }
+  .opt.sel { border-color: var(--accent); color: var(--text); background: #12233a; }
+  .opt.sel.proposed::after { content: " proposed"; color: var(--warn); font-size: 11px; }
+  .note { margin-top: 10px; font-size: 13px; color: var(--dim); }
+  .status { font-size: 12px; font-family: var(--mono); margin-top: 8px; }
+  .status.open { color: var(--warn); }
+  .status.decided { color: var(--ok); }
+  .btn { display: inline-block; background: #21262d; border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: #1f6feb; border-color: #1f6feb; }
+  textarea { width: 100%; min-height: 420px; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 14px; font: 12.5px/1.5 var(--mono);
+    margin-top: 12px; }
+  .pill { display: inline-block; font-size: 11.5px; font-family: var(--mono); border-radius: 10px;
+    padding: 2px 9px; border: 1px solid var(--line); color: var(--dim); margin-right: 6px; }
+  .pill.ok { color: var(--ok); border-color: #238636; }
+  .pill.warn { color: var(--warn); border-color: #9e6a03; }
+  .banner { border: 1px solid #9e6a03; background: #241d0f; color: var(--warn); border-radius: 6px;
+    padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+  .banner.ok { border-color: #238636; background: #0f2417; color: var(--ok); }
+  footer { border-top: 1px solid var(--line); padding: 16px 32px; color: var(--dim); font-size: 12.5px; }
+
+  /* mockups */
+  .mock { border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+    overflow: hidden; margin-bottom: 20px; }
+  .mock.selected { border-color: var(--accent); }
+  .mock .bar { background: var(--panel2); border-bottom: 1px solid var(--line);
+    padding: 8px 14px; font-size: 12.5px; color: var(--dim); font-family: var(--mono);
+    display: flex; align-items: center; gap: 10px; }
+  .mock .bar .sel-toggle { margin-left: auto; cursor: pointer; user-select: none; }
+  .mock .body { padding: 20px; }
+  .comments { border-top: 1px solid var(--line); padding: 14px 18px; background: var(--panel2); }
+  .comment { font-size: 13px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
+  .comment .who { color: var(--accent); font-weight: 600; }
+  .comment .when { color: var(--dim); font-size: 11px; font-family: var(--mono); margin-left: 8px; }
+  .cform { display: flex; gap: 8px; margin-top: 10px; }
+  .cform input, .cform textarea { background: var(--bg); border: 1px solid var(--line);
+    border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px; }
+  .cform input { width: 120px; }
+  .cform textarea { flex: 1; min-height: 34px; resize: vertical; font-family: inherit; }
+  .check { color: var(--ok); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="brand"><!-- BRAND --></span> <!-- TITLE --></h1>
+  <p><!-- SUBTITLE: one sentence on what this grilling session covers and what to do. --></p>
+  <div class="meta"><!-- META: source doc, date, decision count, flow count --></div>
+</header>
+<nav>
+  <a data-tab="decisions" class="active">Decisions</a>
+  <a data-tab="mockups">Mockups</a>
+  <a data-tab="prompt">Generate prompt</a>
+</nav>
+<main>
+  <section id="decisions" class="show">
+    <h2>Open decisions — the grill list</h2>
+    <p class="note" style="margin-bottom:18px">Each card shows the proposed default (marked
+      <span style="color:var(--warn)">proposed</span>). Pick an option to decide it.
+      <span id="progress"></span></p>
+    <div id="cards"></div>
+    <div style="margin-top:18px; display:flex; gap:10px">
+      <button class="btn" onclick="acceptAllProposed()">Accept all proposed defaults</button>
+      <button class="btn" onclick="resetAll()">Reset</button>
+    </div>
+  </section>
+
+  <section id="mockups">
+    <h2>Mockups</h2>
+    <p class="note" style="margin-bottom:18px">Review each screen, leave comments, and toggle
+      which mocks are included in the generated prompt. <span id="mockProgress"></span></p>
+    <div id="mocks"></div>
+  </section>
+
+  <section id="prompt">
+    <h2>Generated prompt</h2>
+    <p class="note">Combines all decisions, selected mockups, and their comments into one
+      copyable prompt.</p>
+    <button class="btn primary" onclick="genPrompt()">Generate prompt</button>
+    <button class="btn" onclick="copyPrompt()">Copy</button>
+    <textarea id="out" spellcheck="false" placeholder="Click “Generate prompt”…"></textarea>
+  </section>
+</main>
+<footer><!-- FOOTER: product name · generated from <source doc> --></footer>
+<script>
+/* ======================================================================
+   DATA — filled in per grilling session.
+   DECISIONS: { id, q, opts: [...], def: index of proposed default }
+   MOCKS:    { id, title, screen, selected: bool, html: string }
+   FACTS:    [strings] — verified facts, go into the prompt verbatim
+   SCOPE / CONSTRAINTS / DELIVERABLES: [strings]
+   ====================================================================== */
+const DECISIONS = [];
+const MOCKS = [];
+const FACTS = [];
+const SCOPE = [];
+const CONSTRAINTS = [];
+const DELIVERABLES = [];
+const TASK = "";
+const SOURCE_DOC = "";
+
+const state = {};   // decision id -> chosen index
+const comments = {}; // mock id -> [{who, text, when}]
+
+/* ---------- decisions ---------- */
+function render() {
+  document.getElementById("cards").innerHTML = DECISIONS.map(d => {
+    const chosen = state[d.id];
+    const opts = d.opts.map((o, i) =>
+      `<span class="opt ${chosen === i ? "sel" : ""} ${i === d.def ? "proposed" : ""}"
+        onclick="decide('${d.id}',${i})">${o}</span>`).join("");
+    const st = chosen === undefined
+      ? `<div class="status open">OPEN — proposed default not yet accepted</div>`
+      : `<div class="status decided">DECIDED${chosen === d.def ? " (proposed default accepted)" : " (differs from proposal)"}</div>`;
+    return `<div class="card"><div class="q"><span class="id">${d.id}</span>${d.q}</div>
+      <div class="opts">${opts}</div>${st}</div>`;
+  }).join("");
+  document.getElementById("progress").textContent =
+    `— ${Object.keys(state).length}/${DECISIONS.length} decided.`;
+}
+function decide(id, i) { state[id] = i; render(); }
+function acceptAllProposed() { DECISIONS.forEach(d => state[d.id] = d.def); render(); }
+function resetAll() { Object.keys(state).forEach(k => delete state[k]); render(); }
+
+/* ---------- mockups ---------- */
+function renderMocks() {
+  document.getElementById("mocks").innerHTML = MOCKS.map(m => {
+    const cs = (comments[m.id] || []).map(c =>
+      `<div class="comment"><span class="who">${esc(c.who)}</span><span class="when">${c.when}</span><br>${esc(c.text)}</div>`).join("");
+    return `<div class="mock ${m.selected ? "selected" : ""}" id="mock-${m.id}">
+      <div class="bar"><span>${m.title}</span><span style="opacity:.6">${m.screen}</span>
+        <span class="sel-toggle" onclick="toggleMock('${m.id}')">${m.selected ? "✓ in prompt" : "＋ include in prompt"}</span></div>
+      <div class="body">${m.html}</div>
+      <div class="comments">${cs}
+        <div class="cform">
+          <input id="cname-${m.id}" placeholder="name">
+          <textarea id="ctext-${m.id}" placeholder="Comment on this screen…"></textarea>
+          <button class="btn" onclick="addComment('${m.id}')">Comment</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  document.getElementById("mockProgress").textContent =
+    `— ${MOCKS.filter(m => m.selected).length}/${MOCKS.length} selected for prompt.`;
+}
+function toggleMock(id) {
+  const m = MOCKS.find(x => x.id === id); m.selected = !m.selected; renderMocks();
+}
+function addComment(id) {
+  const who = document.getElementById("cname-" + id).value.trim() || "anon";
+  const text = document.getElementById("ctext-" + id).value.trim();
+  if (!text) return;
+  (comments[id] = comments[id] || []).push(
+    { who, text, when: new Date().toLocaleString() });
+  renderMocks();
+}
+function esc(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* ---------- prompt ---------- */
+function genPrompt() {
+  const open = DECISIONS.filter(d => state[d.id] === undefined);
+  const sel = MOCKS.filter(m => m.selected);
+  const L = [];
+  L.push(`${TASK} per ${SOURCE_DOC} (read it first — it is the source of truth).`);
+  L.push("");
+  if (FACTS.length) {
+    L.push("VERIFIED FACTS (do not re-research):");
+    FACTS.forEach(f => L.push(`- ${f}`));
+    L.push("");
+  }
+  L.push("DECISIONS (from the grilling session):");
+  DECISIONS.forEach(d => {
+    const v = state[d.id] === undefined ? "OPEN — use proposed default" : d.opts[state[d.id]];
+    L.push(`- ${d.id}: ${v}`);
+  });
+  L.push("");
+  if (sel.length) {
+    L.push("MOCKUPS TO BUILD (selected):");
+    sel.forEach(m => {
+      L.push(`- ${m.title} (${m.screen})`);
+      (comments[m.id] || []).forEach(c => L.push(`  - ${c.who}: ${c.text}`));
+    });
+    L.push("");
+  }
+  if (SCOPE.length) { L.push("SCOPE:"); SCOPE.forEach(s => L.push(s)); L.push(""); }
+  if (CONSTRAINTS.length) { L.push("CONSTRAINTS:"); CONSTRAINTS.forEach(c => L.push(`- ${c}`)); L.push(""); }
+  if (open.length) {
+    L.push(`NOTE: ${open.length} decision(s) still open (${open.map(d => d.id).join(", ")}).`);
+    L.push("Proposed defaults were used; flag them in review."); L.push("");
+  }
+  if (DELIVERABLES.length) { L.push("DELIVERABLES:"); DELIVERABLES.forEach(d => L.push(`- ${d}`)); }
+  document.getElementById("out").value = L.join("\n");
+}
+function copyPrompt() {
+  const t = document.getElementById("out");
+  t.select(); document.execCommand("copy");
+}
+
+/* ---------- nav ---------- */
+document.querySelectorAll("nav a").forEach(a => {
+  a.addEventListener("click", () => {
+    document.querySelectorAll("nav a").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll("main section").forEach(s => s.classList.remove("show"));
+    a.classList.add("active");
+    document.getElementById(a.dataset.tab).classList.add("show");
+  });
+});
+
+render();
+renderMocks();
+</script>
+</body>
+</html>
