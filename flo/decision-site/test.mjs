@@ -4,7 +4,13 @@ const src = fs.readFileSync(new URL('./template.html', import.meta.url), 'utf8')
   .match(/<script>([\s\S]*)<\/script>/)[1];
 
 const INJECT = `
-DECISIONS.push({id:"G1",q:"test q",opts:["a","b"],def:0});
+DECISIONS.push({id:"G1",q:"test q",opts:["a","b"],def:0,
+  dive:{problem:"<p>why it breaks</p>",
+    examples:[{title:"ex one",before:"old <b>",after:"new"},{title:"ex two",before:"b2",after:"a2"}],
+    matrix:{criteria:["fixes","safety"],rows:[
+      {scores:["good","mid"],pros:["fast"],cons:["costs memory"]},
+      {scores:["bad","good"],pros:["safe"],cons:["slow"]}]},
+    graphic:{svg:'<svg viewBox="0 0 10 10"><rect width="5" height="5"/></svg>',caption:"flow"}}});
 MOCKS.push({id:"m1",title:"Mock One",screen:"s.js",selected:true,html:"<p>x</p>"});
 MOCKS.push({id:"m2",title:"Mock Two",screen:"s2.js",selected:true,html:"<p>y</p>"});
 `;
@@ -64,6 +70,36 @@ t('draft cleared after folding', vm.runInContext('drafts["m1"]', r3.ctx) === und
 // 7. reset clears everything
 vm.runInContext('resetAll();', r2.ctx);
 t('reset clears state', vm.runInContext('Object.keys(state).length', r2.ctx) === 0);
+
+// 8. deep dive renders every part and escapes plain-text fields
+const cards = vm.runInContext('render(); document.getElementById("cards").innerHTML', r2.ctx);
+t('dive problem rendered', cards.includes('why it breaks'));
+t('dive examples rendered + escaped', cards.includes('ex two') && cards.includes('old &lt;b&gt;'));
+t('dive matrix has a row per option', (cards.match(/class="opt-name/g) || []).length === 2 && cards.includes('costs memory'));
+t('dive graphic svg rendered', cards.includes('<svg viewBox="0 0 10 10">'));
+
+// 9. validation: complete dive passes; missing pieces are reported
+t('complete dive validates', vm.runInContext('validateDecisions().length', r2.ctx) === 0);
+vm.runInContext('DECISIONS.push({id:"G2",q:"bare",opts:["x","y"],def:0});', r2.ctx);
+const errs = vm.runInContext('validateDecisions()', r2.ctx);
+t('missing dive reported', errs.some(e => e.startsWith('G2')));
+vm.runInContext(`DECISIONS[DECISIONS.length-1].dive = {problem:"<p>p</p>",
+  examples:[{title:"one",before:"b",after:"a"}],
+  matrix:{criteria:["c"],rows:[{scores:["good"],pros:["p"],cons:["c"]}]},
+  graphic:{svg:"none"}};`, r2.ctx);
+const errs2 = vm.runInContext('validateDecisions().join("|")', r2.ctx);
+t('too few examples reported', errs2.includes('G2: needs >= 2 examples'));
+t('short matrix reported', errs2.includes('G2: matrix needs one row per option'));
+t('missing svg reported', errs2.includes('G2: missing inline SVG graphic'));
+vm.runInContext('DECISIONS.pop();', r2.ctx);
+
+// 10. chosen option's cons reach the prompt as the accepted trade-off
+vm.runInContext('decide("G1",1); genPrompt();', r2.ctx);
+const out4 = vm.runInContext('document.getElementById("out").value', r2.ctx);
+t('accepts line for chosen option', out4.includes('G1: b') && out4.includes('accepts: slow'));
+vm.runInContext('resetAll(); genPrompt();', r2.ctx);
+const out5 = vm.runInContext('document.getElementById("out").value', r2.ctx);
+t('open decision shows proposed trade-off', out5.includes('accepts: costs memory'));
 
 console.log(fails ? `\n${fails} FAILURES` : '\nALL TESTS PASS');
 process.exit(fails ? 1 : 0);
