@@ -23,6 +23,9 @@ dependencies, works from `file://`). Structure:
 <output>/index.html
 ```
 
+Skill files: `SKILL.md`, `template.html` (engine), `test.mjs` (harness),
+`open-site.sh` (opens the finished site in the browser), `examples/`.
+
 The file contains three sections behind a sticky nav:
 
 1. **Decisions** — one card per open decision. Each card shows the question,
@@ -204,7 +207,15 @@ and note it in the site header.
    verify a submitted comment appears in the generated prompt, and verify
    `validateDecisions()` returns no errors for the real DECISIONS (every card
    has a problem, >= 2 examples, a full pro/con matrix and an SVG graphic).
-4. Open the file in the browser for the operator.
+4. **MANDATORY: open the site.** After the tests pass, run
+   `flo/decision-site/open-site.sh <index.html>` (resolves the absolute path,
+   opens the right browser opener for macOS/Linux/WSL/Git-Bash, and prints the
+   absolute `file://` URL as its last line). Open it when the first working
+   version passes the tests and again when the build is finished; during
+   multi-iteration builds do not reopen on every iteration, tell the operator
+   to refresh the tab. Skip opening only if the operator asked not to (`--no-open`)
+   or the session has no GUI (the script detects this and just prints the URL).
+   Either way, always report the absolute path/URL in your reply.
 5. Tell the operator: walk Decisions, review Mockups (comment + select), then
   Generate → Copy.
 

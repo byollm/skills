@@ -1,5 +1,5 @@
 // Headless functional test for the decision-site template engine.
-import fs from 'fs'; import vm from 'vm';
+import fs from 'fs'; import vm from 'vm'; import { fileURLToPath } from 'url';
 const file = process.argv[2] || (fs.existsSync(new URL('./index.html', import.meta.url)) ? 'index.html' : 'template.html');
 const src = fs.readFileSync(new URL('./' + file, import.meta.url), 'utf8')
   .match(/<script>([\s\S]*)<\/script>/)[1];
@@ -139,6 +139,36 @@ t('accepts line for chosen object option', out4.includes('G1: b <obj>') && out4.
 vm.runInContext('resetAll(); genPrompt();', r2.ctx);
 const out5 = vm.runInContext('document.getElementById("out").value', r2.ctx);
 t('open decision shows proposed trade-off', out5.includes('accepts: costs memory'));
+
+// 12. open-site.sh: default-open helper (dry-run only; never launches a browser)
+import cp from 'child_process'; import os from 'os'; import path from 'path';
+const script = fileURLToPath(new URL('./open-site.sh', import.meta.url));
+t('open-site.sh exists and is executable', (() => { try { fs.accessSync(script, fs.constants.X_OK); return true; } catch { return false; } })());
+t('SKILL.md mentions open-site.sh', fs.readFileSync(new URL('./SKILL.md', import.meta.url), 'utf8').includes('open-site.sh'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'open site '));
+const page = path.join(tmp, 'index.html'); fs.writeFileSync(page, '<html></html>');
+const realTmp = fs.realpathSync(tmp);
+const run = (args, env = {}) => {
+  const e = { PATH: process.env.PATH, HOME: process.env.HOME, DISPLAY: ':0', OPEN_SITE_DRY_RUN: '1', ...env };
+  const r = cp.spawnSync('bash', [script, ...args], { env: e, encoding: 'utf8' });
+  return { code: r.status, out: r.stdout, err: r.stderr, last: r.stdout.trim().split('\n').pop() };
+};
+const wantUrl = 'file://' + realTmp.split(' ').join('%20') + '/index.html';
+const dar = run([page], { OPEN_SITE_OS: 'darwin' });
+t('darwin dry-run: would run open <path>', dar.out.includes('would run: open ' + path.join(realTmp, 'index.html')));
+t('url is absolute file:// with encoded space, on the last line', dar.last === wantUrl && wantUrl.includes('%20'));
+t('linux dry-run uses xdg-open', run([page], { OPEN_SITE_OS: 'linux' }).out.includes('would run: xdg-open '));
+for (const [name, args, env] of [['OS none', [page], { OPEN_SITE_OS: 'none' }],
+    ['--no-open', ['--no-open', page], { OPEN_SITE_OS: 'darwin' }],
+    ['OPEN_SITE_DISABLE=1', [page], { OPEN_SITE_OS: 'darwin', OPEN_SITE_DISABLE: '1' }],
+    ['linux without display', [page], { OPEN_SITE_OS: 'linux', DISPLAY: '' }]]) {
+  const r = run(args, env);
+  t(name + ': prints URL, says not opened, no opener', r.code === 0 && r.last === wantUrl &&
+    /not opened/i.test(r.out) && !r.out.includes('would run'));
+}
+const miss = run([path.join(tmp, 'nope.html')], { OPEN_SITE_OS: 'darwin' });
+t('missing file exits 2', miss.code === 2 && /not found/.test(miss.err));
+fs.rmSync(tmp, { recursive: true, force: true });
 
 console.log(fails ? `\n${fails} FAILURES` : '\nALL TESTS PASS');
 process.exit(fails ? 1 : 0);
