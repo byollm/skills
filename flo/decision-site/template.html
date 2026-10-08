@@ -128,6 +128,33 @@
   .tag { font-size: 11px; font-family: var(--mono); border-radius: 4px; padding: 1px 6px; }
   .tag.pub { color: var(--ok); border: 1px solid #238636; }
   .tag.priv { color: var(--warn); border: 1px solid #9e6a03; }
+
+  /* deep dive (required on every decision card) */
+  details.dive { margin: 6px 0 12px; border-left: 2px solid var(--line); padding: 2px 0 2px 12px; }
+  details.dive summary { cursor: pointer; color: var(--dim); font-size: 12.5px; }
+  .dive h4 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); }
+  .dive p, .dive li { font-size: 13.5px; color: #c9d1d9; }
+  .dive ul { margin: 6px 0; padding-left: 20px; }
+  code { font-family: var(--mono); font-size: 12.5px; background: #0b1016; border: 1px solid #222a33;
+    border-radius: 4px; padding: 0 4px; color: #d2a8ff; }
+  .ex { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 12px; }
+  .ex .t { grid-column: 1 / -1; font-size: 13px; color: var(--text); font-weight: 600; }
+  .ex pre { margin: 0; font: 12px/1.5 var(--mono); background: #0b1016; border: 1px solid #222a33;
+    border-radius: 6px; padding: 8px 10px; overflow-x: auto; color: #c9d1d9; white-space: pre-wrap; }
+  .ex .lbl { font: 11px var(--mono); margin-bottom: 4px; }
+  .ex .lbl.b { color: var(--bad); } .ex .lbl.a { color: var(--ok); }
+  table.matrix { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 6px 0 10px; }
+  table.matrix th, table.matrix td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; text-align: left; }
+  table.matrix th { background: var(--panel2); color: var(--dim); font-weight: 500; }
+  table.matrix td.opt-name { color: var(--text); font-weight: 600; min-width: 140px; }
+  table.matrix td.opt-name.proposed::after { content: " · proposed"; color: var(--warn); font-weight: 400; font-size: 11px; }
+  table.matrix .sc { font-family: var(--mono); text-align: center; white-space: nowrap; }
+  .sc.good { color: var(--ok); } .sc.mid { color: var(--warn); } .sc.bad { color: var(--bad); }
+  table.matrix ul { margin: 0; padding-left: 16px; }
+  .pro li::marker { content: "+ "; color: var(--ok); } .con li::marker { content: "− "; color: var(--bad); }
+  .graphic { background: #0b1016; border: 1px solid #222a33; border-radius: 6px; padding: 10px; margin: 6px 0 4px; }
+  .graphic svg { width: 100%; height: auto; display: block; }
+  .graphic .cap { font-size: 12px; color: var(--dim); margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -147,6 +174,7 @@
     <p class="note" style="margin-bottom:18px">Each card shows the proposed default (marked
       <span style="color:var(--warn)">proposed</span>). Pick an option to decide it.
       <span id="progress"></span></p>
+    <div id="diveWarn"></div>
     <div id="cards"></div>
     <div style="margin-top:18px; display:flex; gap:10px">
       <button class="btn" onclick="acceptAllProposed()">Accept all proposed defaults</button>
@@ -175,7 +203,8 @@
 /* ======================================================================
    DATA — filled in per grilling session.
    DECISIONS: { id, q, opts: [option...], def: index of proposed default,
-                problem?: {what, when, why, impact, link?, linkLabel?} }
+                problem?: {what, when, why, impact, link?, linkLabel?},
+                dive: {...} }          // dive is REQUIRED, see below
      option  = "label"  OR  { t: "label", tip: { what: "plain-English meaning",
                                                  pros: ["..."], cons: ["..."] } }
                Use optText(o) wherever option text is needed. Options with a tip get an
@@ -184,6 +213,22 @@
                What happened / When it happened / Why it happened / What it means for us.
                link (e.g. "explain-D1.html") adds a new-tab button labelled linkLabel
                (default "Open the interactive explainer").
+               NOTE: d.problem (popover; plain-text what/when/why/impact) is a DIFFERENT
+               field from d.dive.problem (trusted HTML narrative in the deep dive).
+     dive    = REQUIRED deep dive (validateDecisions checks it):
+       dive: {
+         problem: "<p>…</p>",        // trusted HTML: what goes wrong today, with real
+                                     // file:line references and measured numbers
+         examples: [                 // >= 2 concrete examples from the source/codebase
+           { title, before, after }  // plain text (escaped); before = today, after = with proposal
+         ],
+         matrix: {                   // pro/con matrix covering EVERY option in opts
+           criteria: ["…", …],       // 3-5 criteria, e.g. fixes the case / safety / complexity / cost
+           rows: [ { scores: ["good"|"mid"|"bad" or "text", …],  // one per criterion
+                     pros: ["…"], cons: ["…"] }, … ]          // one row per option, same order as opts
+         },
+         graphic: { svg: "<svg …>…</svg>", caption: "…" }     // inline SVG, no external assets
+       }
    MOCKS:    { id, title, screen, selected: bool, html: string }
    FACTS / SCOPE / CONSTRAINTS / DELIVERABLES: [strings]
    TASK / SOURCE_DOC: strings
@@ -243,7 +288,7 @@ function render() {
     else if (isFree) st = `<div class="status decided">DECIDED (freeform${freeform[d.id] ? "" : " — empty, will fall back to proposed default"})</div>`;
     else st = `<div class="status decided">DECIDED${chosen === d.def ? " (proposed default accepted)" : " (differs from proposal)"}</div>`;
     return `<div class="card"><div class="q"><span class="id">${d.id}</span><span>${esc(d.q)}</span>${about}</div>
-      <div class="opts">${opts}${free}</div>${st}</div>`;
+      ${renderDive(d)}<div class="opts">${opts}${free}</div>${st}</div>`;
   }).join("");
   document.getElementById("progress").textContent =
     `— ${Object.keys(state).length}/${DECISIONS.length} decided.`;
@@ -353,6 +398,55 @@ if (typeof document.addEventListener === "function" && typeof window !== "undefi
   window.addEventListener("resize", hideTip);
   window.addEventListener("scroll", () => { if (tipOwner) hideTip(); }, true);
 }
+
+/* Deep dive: problem, examples, pro/con matrix, graphic. */
+function renderDive(d) {
+  const v = d.dive;
+  if (!v) return "";
+  const problem = v.problem ? `<h4>Problem</h4>${v.problem}` : "";
+  const examples = (v.examples || []).length ? `<h4>Examples</h4>` + v.examples.map(e =>
+    `<div class="ex"><div class="t">${esc(e.title)}</div>
+      <div><div class="lbl b">TODAY</div><pre>${esc(e.before)}</pre></div>
+      <div><div class="lbl a">WITH PROPOSAL</div><pre>${esc(e.after)}</pre></div></div>`).join("") : "";
+  let matrix = "";
+  if (v.matrix && v.matrix.rows) {
+    const crit = v.matrix.criteria || [];
+    const head = `<tr><th>Option</th>${crit.map(c => `<th>${esc(c)}</th>`).join("")}<th>Pros</th><th>Cons</th></tr>`;
+    const rows = v.matrix.rows.map((r, i) => {
+      const sc = (r.scores || []).map(s => {
+        const cls = s === "good" ? "good" : s === "mid" ? "mid" : s === "bad" ? "bad" : "";
+        const txt = s === "good" ? "●" : s === "mid" ? "◐" : s === "bad" ? "○" : esc(s);
+        return `<td class="sc ${cls}">${txt}</td>`;
+      }).join("");
+      return `<tr><td class="opt-name ${i === d.def ? "proposed" : ""}">${esc(d.opts[i] === undefined ? "" : optText(d.opts[i]))}</td>${sc}
+        <td><ul class="pro">${(r.pros || []).map(p => `<li>${esc(p)}</li>`).join("")}</ul></td>
+        <td><ul class="con">${(r.cons || []).map(c => `<li>${esc(c)}</li>`).join("")}</ul></td></tr>`;
+    }).join("");
+    matrix = `<h4>Pro / con matrix</h4><table class="matrix">${head}${rows}</table>
+      <div class="note">● strong · ◐ partial · ○ weak</div>`;
+  }
+  const graphic = v.graphic && v.graphic.svg ? `<h4>Graphic</h4><div class="graphic">${v.graphic.svg}
+      ${v.graphic.caption ? `<div class="cap">${esc(v.graphic.caption)}</div>` : ""}</div>` : "";
+  return `<details class="dive" open><summary>Deep dive: problem, examples, pro/con matrix, graphic</summary>
+    ${problem}${examples}${matrix}${graphic}</details>`;
+}
+
+/* Returns a list of problems; empty when every decision has a complete deep dive. */
+function validateDecisions() {
+  const errs = [];
+  DECISIONS.forEach(d => {
+    const v = d.dive;
+    if (!v) { errs.push(`${d.id}: missing dive`); return; }
+    if (!v.problem) errs.push(`${d.id}: missing dive.problem`);
+    if (!v.examples || v.examples.length < 2) errs.push(`${d.id}: needs >= 2 examples`);
+    if (!v.matrix || !v.matrix.rows || v.matrix.rows.length !== d.opts.length)
+      errs.push(`${d.id}: matrix needs one row per option (${d.opts.length})`);
+    else if (v.matrix.rows.some(r => !(r.pros || []).length || !(r.cons || []).length))
+      errs.push(`${d.id}: every matrix row needs pros and cons`);
+    if (!v.graphic || !/<svg[\s>]/.test(v.graphic.svg || "")) errs.push(`${d.id}: missing inline SVG graphic`);
+  });
+  return errs;
+}
 function decide(id, i) { state[id] = i; saveState(); render(); }
 function decideFree(id) { state[id] = "free"; saveState(); render();
   const el = document.getElementById("free-" + id); if (el) el.focus(); }
@@ -439,7 +533,12 @@ function genPrompt() {
     L.push("");
   }
   L.push("DECISIONS (from the grilling session):");
-  DECISIONS.forEach(d => L.push(`- ${d.id}: ${decisionValue(d)}`));
+  DECISIONS.forEach(d => {
+    L.push(`- ${d.id}: ${decisionValue(d)}`);
+    const i = typeof state[d.id] === "number" ? state[d.id] : (state[d.id] === undefined ? d.def : -1);
+    const row = d.dive && d.dive.matrix && d.dive.matrix.rows && d.dive.matrix.rows[i];
+    if (row && (row.cons || []).length) L.push(`  accepts: ${row.cons.join("; ")}`);
+  });
   L.push("");
   if (sel.length) {
     L.push("MOCKUPS TO BUILD (selected):");
@@ -476,6 +575,12 @@ document.querySelectorAll("nav a").forEach(a => {
 loadState();
 render();
 renderMocks();
+(function warnIncompleteDives() {
+  const errs = validateDecisions();
+  if (!errs.length) return;
+  document.getElementById("diveWarn").innerHTML =
+    `<div class="banner">Incomplete deep dives (fix before handing this to the operator):<br>${errs.map(esc).join("<br>")}</div>`;
+})();
 </script>
 </body>
 </html>

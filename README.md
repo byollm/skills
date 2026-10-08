@@ -15,4 +15,4 @@ Agent skills by flo. Each skill lives in `<category>/<skill-name>/` with a
 
 Point your agent at a skill's `SKILL.md` (e.g. via a skills directory or an
 explicit path) and give it the source document (usually a PRD). The skill
-generates a self-contained HTML site — no build step, no dependencies.
+generates a self-contained HTML site — no build step, no dependencies. The skill opens the finished site in the browser by default (`open-site.sh`).
