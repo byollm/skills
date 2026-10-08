@@ -35,12 +35,54 @@
     padding: 16px 18px; margin-bottom: 14px; }
   .card .q { font-weight: 600; margin-bottom: 8px; }
   .card .q .id { color: var(--accent); font-family: var(--mono); font-size: 13px; margin-right: 8px; }
-  .opts { display: flex; flex-wrap: wrap; gap: 8px; }
-  .opt { border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer;
-    font-size: 13.5px; color: var(--dim); background: var(--panel2); user-select: none; }
+  .card .q { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0; }
+  .opts { display: flex; flex-direction: column; gap: 8px; }
+  .optrow { display: flex; align-items: stretch; gap: 8px; width: 100%; }
+  .optrow.free { align-items: center; }
+  .optrow.free .freeinput { flex: 1; min-width: 0; }
+  .opt { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px;
+    cursor: pointer; font-size: 13.5px; color: var(--dim); background: var(--panel2); user-select: none; }
+  .optrow.free .opt { flex: 0 0 auto; }
+  .info { flex: 0 0 auto; width: 34px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel2); color: var(--accent); font-size: 16px; line-height: 1; cursor: pointer;
+    padding: 0; font-family: inherit; }
+  .info:hover, .info:focus-visible, .info[aria-expanded="true"] { border-color: var(--accent); background: #12233a; outline: none; }
+  .about { margin-left: auto; background: transparent; border: 1px solid var(--line); border-radius: 6px;
+    color: var(--accent); font: inherit; font-size: 12.5px; font-weight: 500; padding: 3px 10px; cursor: pointer; }
+  .about:hover, .about:focus-visible, .about[aria-expanded="true"] { border-color: var(--accent); background: #12233a; outline: none; }
+  /* tooltip / popover (single shared element, position:fixed so it is never clipped) */
+  .tip { position: fixed; z-index: 100; left: 0; top: 0; width: 380px; max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px); overflow-y: auto; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; font-size: 13px; line-height: 1.5;
+    box-shadow: 0 8px 28px rgba(1,4,9,.65), 0 1px 3px rgba(1,4,9,.5);
+    visibility: hidden; opacity: 0; transform: translateY(4px) scale(.98);
+    transition: opacity .14s ease, transform .14s ease, visibility 0s linear .14s; pointer-events: none; }
+  .tip.above { transform: translateY(-4px) scale(.98); }
+  .tip.show { visibility: visible; opacity: 1; transform: none; pointer-events: auto;
+    transition: opacity .14s ease, transform .14s ease, visibility 0s; }
+  .tip .arrow { position: absolute; left: var(--ax, 24px); width: 10px; height: 10px; margin-left: -5px;
+    background: var(--panel); border: 1px solid var(--line); transform: rotate(45deg); }
+  .tip.below .arrow { top: -6px; border-right: 0; border-bottom: 0; }
+  .tip.above .arrow { bottom: -6px; border-left: 0; border-top: 0; }
+  .tip .th { font-weight: 600; font-size: 13.5px; margin-bottom: 6px; color: var(--text); }
+  .tip .tl { font-size: 11px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .05em;
+    color: var(--dim); margin: 10px 0 3px; }
+  .tip .th + .tl { margin-top: 0; }
+  .tip .tl.pro { color: var(--ok); }
+  .tip .tl.con { color: var(--bad); }
+  .tip p { margin: 0; }
+  .tip ul { margin: 0; padding-left: 18px; }
+  .tip li { margin: 2px 0; }
+  .tip ul.pros li::marker { color: var(--ok); }
+  .tip ul.cons li::marker { color: var(--bad); }
+  .tip .plink { display: block; margin-top: 14px; text-align: center; text-decoration: none; background: #1f6feb;
+    border: 1px solid #1f6feb; color: #fff; border-radius: 6px; padding: 8px 14px; font-weight: 600; font-size: 13.5px; }
+  .tip .plink:hover, .tip .plink:focus-visible { background: #388bfd; outline: none; }
+  @media (max-width: 759px) { .info { width: 40px; } main { padding: 20px 14px 80px; } }
+  @media (prefers-reduced-motion: reduce) { .tip, .tip.show { transition: none; transform: none; } }
   .opt:hover { border-color: var(--dim); color: var(--text); }
   .opt.sel { border-color: var(--accent); color: var(--text); background: #12233a; }
-  .opt.sel.proposed::after { content: " proposed"; color: var(--warn); font-size: 11px; }
+  .opt.proposed::after { content: " · proposed"; color: var(--warn); font-size: 11px; font-family: var(--mono); }
   .note { margin-top: 10px; font-size: 13px; color: var(--dim); }
   .status { font-size: 12px; font-family: var(--mono); margin-top: 8px; }
   .status.open { color: var(--warn); }
@@ -132,7 +174,16 @@
 <script>
 /* ======================================================================
    DATA — filled in per grilling session.
-   DECISIONS: { id, q, opts: [...], def: index of proposed default }
+   DECISIONS: { id, q, opts: [option...], def: index of proposed default,
+                problem?: {what, when, why, impact, link?, linkLabel?} }
+     option  = "label"  OR  { t: "label", tip: { what: "plain-English meaning",
+                                                 pros: ["..."], cons: ["..."] } }
+               Use optText(o) wherever option text is needed. Options with a tip get an
+               ⓘ affordance (hover / focus / click opens a popover card).
+     problem = optional; adds an "ⓘ About this problem" button to the card header with
+               What happened / When it happened / Why it happened / What it means for us.
+               link (e.g. "explain-D1.html") adds a new-tab button labelled linkLabel
+               (default "Open the interactive explainer").
    MOCKS:    { id, title, screen, selected: bool, html: string }
    FACTS / SCOPE / CONSTRAINTS / DELIVERABLES: [strings]
    TASK / SOURCE_DOC: strings
@@ -174,21 +225,133 @@ function render() {
   document.getElementById("cards").innerHTML = DECISIONS.map(d => {
     const chosen = state[d.id];
     const isFree = chosen === "free";
-    const opts = d.opts.map((o, i) =>
-      `<span class="opt ${chosen === i ? "sel" : ""} ${i === d.def ? "proposed" : ""}"
-        onclick="decide('${d.id}',${i})">${esc(o)}</span>`).join("");
-    const free = `<span class="opt ${isFree ? "sel" : ""}" onclick="decideFree('${d.id}')">Other…</span>
+    const opts = d.opts.map((o, i) => {
+      const hasTip = !!optTip(o);
+      return `<div class="optrow"${hasTip ? ` data-tip="${esc(d.id)}:${i}"` : ""}>
+        <span class="opt ${chosen === i ? "sel" : ""} ${i === d.def ? "proposed" : ""}"
+          onclick="decide('${d.id}',${i})">${esc(optText(o))}</span>${hasTip
+          ? `<button type="button" class="info" data-tip="${esc(d.id)}:${i}" aria-describedby="tip"
+              aria-label="About option: ${esc(optText(o))}" aria-expanded="false">ⓘ</button>` : ""}</div>`;
+    }).join("");
+    const free = `<div class="optrow free"><span class="opt ${isFree ? "sel" : ""}" onclick="decideFree('${d.id}')">Other…</span>
       <input class="freeinput" id="free-${d.id}" placeholder="write your own answer"
-        value="${esc(freeform[d.id] || "")}" oninput="freeInput('${d.id}', this.value)">`;
+        value="${esc(freeform[d.id] || "")}" oninput="freeInput('${d.id}', this.value)"></div>`;
+    const about = d.problem ? `<button type="button" class="about" data-prob="${esc(d.id)}"
+      aria-haspopup="dialog" aria-describedby="tip" aria-expanded="false">ⓘ About this problem</button>` : "";
     let st;
     if (chosen === undefined) st = `<div class="status open">OPEN — proposed default not yet accepted</div>`;
     else if (isFree) st = `<div class="status decided">DECIDED (freeform${freeform[d.id] ? "" : " — empty, will fall back to proposed default"})</div>`;
     else st = `<div class="status decided">DECIDED${chosen === d.def ? " (proposed default accepted)" : " (differs from proposal)"}</div>`;
-    return `<div class="card"><div class="q"><span class="id">${d.id}</span>${esc(d.q)}</div>
+    return `<div class="card"><div class="q"><span class="id">${d.id}</span><span>${esc(d.q)}</span>${about}</div>
       <div class="opts">${opts}${free}</div>${st}</div>`;
   }).join("");
   document.getElementById("progress").textContent =
     `— ${Object.keys(state).length}/${DECISIONS.length} decided.`;
+  hideTip();
+}
+
+/* ---------- option text + tooltip content ---------- */
+function optText(o) { return (o !== null && typeof o === "object") ? String(o.t) : String(o); }
+function optTip(o) { return (o !== null && typeof o === "object" && o.tip) ? o.tip : null; }
+function tipHTML(o) {
+  const tip = optTip(o); if (!tip) return "";
+  let h = `<div class="th">${esc(optText(o))}</div>`;
+  if (tip.what) h += `<div class="tl">What it means</div><p>${esc(tip.what)}</p>`;
+  if ((tip.pros || []).length)
+    h += `<div class="tl pro">Pros</div><ul class="pros">${tip.pros.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`;
+  if ((tip.cons || []).length)
+    h += `<div class="tl con">Cons</div><ul class="cons">${tip.cons.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`;
+  return h;
+}
+function problemHTML(d) {
+  const p = d && d.problem; if (!p) return "";
+  const blk = (label, v) => v ? `<div class="tl">${label}</div><p>${esc(v)}</p>` : "";
+  let h = `<div class="th">${esc(d.id)} — About this problem</div>` +
+    blk("What happened", p.what) + blk("When it happened", p.when) +
+    blk("Why it happened", p.why) + blk("What it means for us", p.impact);
+  if (p.link && !/^\s*javascript:/i.test(p.link))
+    h += `<a class="plink" href="${esc(p.link)}" target="_blank" rel="noopener noreferrer">${esc(p.linkLabel || "Open the interactive explainer")} ↗</a>`;
+  return h;
+}
+
+/* ---------- tooltip / popover behaviour (single shared element) ---------- */
+let tipEl = null, tipOwner = null, tipPinned = false, tipTimer = null;
+function ensureTip() {
+  if (tipEl) return tipEl;
+  tipEl = document.createElement("div");
+  tipEl.id = "tip"; tipEl.className = "tip"; tipEl.setAttribute("role", "tooltip");
+  document.body.appendChild(tipEl);
+  return tipEl;
+}
+function tipContentFor(el) {
+  const tk = el.getAttribute("data-tip"), pk = el.getAttribute("data-prob");
+  if (tk) { const [id, i] = tk.split(":"); const d = DECISIONS.find(x => x.id === id);
+    return d ? { html: tipHTML(d.opts[+i]), role: "tooltip" } : null; }
+  if (pk) { const d = DECISIONS.find(x => x.id === pk);
+    return d ? { html: problemHTML(d), role: "dialog" } : null; }
+  return null;
+}
+function showTip(anchor, pin) {
+  const c = tipContentFor(anchor); if (!c || !c.html) return;
+  clearTimeout(tipTimer);
+  const t = ensureTip();
+  if (tipOwner) tipOwner.setAttribute("aria-expanded", "false");
+  const btn = anchor.matches(".info,.about") ? anchor : (anchor.querySelector(".info") || anchor);
+  tipOwner = btn; tipPinned = !!pin;
+  btn.setAttribute("aria-expanded", "true"); btn.setAttribute("aria-describedby", "tip");
+  t.setAttribute("role", c.role);
+  t.innerHTML = c.html + '<span class="arrow"></span>';
+  t.classList.remove("show");
+  placeTip(t, anchor, btn);
+  t.classList.add("show");
+}
+function placeTip(t, row, btn) {
+  const vw = window.innerWidth, vh = window.innerHeight, pad = 8, gap = 12;
+  t.classList.remove("above"); t.classList.add("below");
+  t.style.left = "0px"; t.style.top = "0px";
+  const w = t.offsetWidth, h = t.offsetHeight;
+  const r = row.getBoundingClientRect(), b = btn.getBoundingClientRect();
+  const cx = b.left + b.width / 2;
+  const left = Math.max(pad, Math.min(cx - 28, vw - w - pad));
+  let top = r.bottom + gap, below = true;
+  if (top + h > vh - pad && r.top - gap - h >= pad) { top = r.top - gap - h; below = false; }
+  else if (top + h > vh - pad) top = Math.max(pad, vh - h - pad);
+  t.classList.toggle("below", below); t.classList.toggle("above", !below);
+  t.style.left = left + "px"; t.style.top = top + "px";
+  t.style.setProperty("--ax", Math.max(14, Math.min(cx - left, w - 14)) + "px");
+}
+function hideTip() {
+  clearTimeout(tipTimer);
+  if (tipEl) tipEl.classList.remove("show");
+  if (tipOwner) tipOwner.setAttribute("aria-expanded", "false");
+  tipOwner = null; tipPinned = false;
+}
+if (typeof document.addEventListener === "function" && typeof window !== "undefined") {
+  const trig = e => e.target && e.target.closest ? e.target.closest("[data-tip],[data-prob]") : null;
+  const inTip = e => e.target && e.target.closest && e.target.closest("#tip");
+  document.addEventListener("mouseover", e => {
+    const r = trig(e);
+    if (r) { if (!tipPinned) showTip(r, false); else clearTimeout(tipTimer); return; }
+    if (inTip(e)) { clearTimeout(tipTimer); return; }
+    if (tipOwner && !tipPinned) { clearTimeout(tipTimer); tipTimer = setTimeout(hideTip, 160); }
+  });
+  document.addEventListener("focusin", e => {
+    const r = trig(e); if (r && r.matches(".info,.about") && !tipPinned) showTip(r, false);
+  });
+  document.addEventListener("focusout", e => {
+    if (!tipPinned && trig(e)) tipTimer = setTimeout(hideTip, 160);
+  });
+  document.addEventListener("click", e => {
+    const r = trig(e);
+    if (r && r.matches(".info,.about")) {
+      if (tipOwner === r && tipPinned) hideTip(); else showTip(r, true);
+    } else if (!inTip(e)) hideTip();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && tipOwner) { const o = tipOwner; hideTip(); if (o.focus) o.focus(); }
+  });
+  window.addEventListener("resize", hideTip);
+  window.addEventListener("scroll", () => { if (tipOwner) hideTip(); }, true);
 }
 function decide(id, i) { state[id] = i; saveState(); render(); }
 function decideFree(id) { state[id] = "free"; saveState(); render();
@@ -250,7 +413,7 @@ function decisionValue(d) {
     const t = (freeform[d.id] || "").trim();
     return t || "OPEN — use proposed default (freeform left empty)";
   }
-  return d.opts[chosen];
+  return optText(d.opts[chosen]);
 }
 function genPrompt() {
   // Fold any unsubmitted comment drafts into comments so nothing typed is lost.

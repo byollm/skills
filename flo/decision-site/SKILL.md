@@ -26,7 +26,7 @@ dependencies, works from `file://`). Structure:
 The file contains three sections behind a sticky nav:
 
 1. **Decisions** — one card per open decision. Each card shows the question,
-   the options (the PRD's proposed default is tagged "proposed"), an
+   the options stacked as rows with ⓘ pros/cons tooltips (the PRD's proposed default is tagged "proposed"), an "About this problem" popover, an
    **"Other…" freeform option** with a text input for a custom answer, and an
    OPEN/DECIDED status. Clicking an option decides it. "Accept all proposed
    defaults" and "Reset" buttons. A progress counter (n/total decided).
@@ -66,6 +66,56 @@ the form inputs. Key: `decision-site:<SOURCE_DOC>`.
   border + check.
 - No external assets, no CDN, no images. Inline SVG icons only if needed.
 
+## Explanations are REQUIRED (tooltips + explainers)
+
+Every decision must be explainable without leaving the page. Write in easy
+English: short sentences (about 15 words max), a concrete example, no jargon
+without a one-line gloss. The operator should be able to decide from the page
+alone.
+
+**Options are stacked** one under another (full-width rows), not inline chips.
+Each option carries an ⓘ tooltip (hover, keyboard focus, or click/tap; Esc or
+outside click closes it):
+
+```js
+opts: [
+  { t: "Option label",
+    tip: { what: "What this choice means, in plain words.",
+           pros: ["honest upside", "another upside"],
+           cons: ["real cost or risk", "another cost"] } },
+  ...
+]
+```
+
+Plain strings still work (no tooltip). Pros and cons must be honest trade-offs
+(risk, effort, test cost, behaviour change), never marketing. The proposed
+default is marked "proposed".
+
+**Each decision has an "About this problem" popover** with four blocks:
+
+```js
+problem: {
+  what:   "What went wrong, in one or two short sentences.",
+  when:   "When it was found/happened (date, PR, file:line).",
+  why:    "The root cause in plain words.",
+  impact: "What happens to users/agents if it is not fixed.",
+  // only when the problem is complex:
+  link: "explain-D1.html", linkLabel: "Open the interactive explainer"
+}
+```
+
+**Interactive explainers.** If a problem is complex (state machines, timelines,
+dependency graphs, anything where seeing it move helps), also write a sibling
+single-file page `explain-<id>.html` and set `problem.link`. It must be
+self-contained (no CDN), dark palette, with real controls the reader can drive
+(sliders, step buttons, toggles for each option) and a "Back to decisions"
+link. See `examples/explain-example.html`. Skip the link for simple problems.
+
+Rules: the engine hides the popover on resize/scroll by design; the link is
+only rendered for http(s)/relative URLs (never `javascript:`); tooltips are
+`position:fixed` and flip to stay on screen. The test harness covers
+`optText`, tooltip content, and link rendering.
+
 ## Inputs
 
 Read the source doc (usually a PRD) and extract:
@@ -86,7 +136,7 @@ and note it in the site header.
 ## Process
 
 1. Read the source doc fully. List decisions, facts, flows, constraints.
-2. Write the HTML file: skeleton + CSS first, then sections, then the
+2. Write tooltip content (`tip`, `problem`) for every decision, and an `explain-<id>.html` for each complex one. Write the HTML file: skeleton + CSS first, then sections, then the
   DECISIONS/MOCKS data + render/prompt logic in vanilla JS.
 3. Run the functional test harness against the generated file's engine
    (see test.mjs — freeform, draft persistence, comment-to-prompt, reload

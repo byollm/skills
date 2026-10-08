@@ -1,0 +1,111 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Decision D1 explainer</title><style>
+:root{--bg:#0d1117;--panel:#161b22;--bd:#30363d;--fg:#e6edf3;--mut:#8b949e;--acc:#58a6ff;--ok:#3fb950;--warn:#d29922;--bad:#f85149}
+*{box-sizing:border-box}
+html{background:#0d1117}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px}
+a{color:var(--acc)}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em}
+code{background:#1f2630;padding:1px 5px;border-radius:4px}
+h1{font-size:1.7rem;margin:.4em 0 .2em}
+h2{font-size:1.1rem;margin:0 0 .6em;color:var(--acc)}
+.tag{color:var(--mut);font-size:.85rem;font-family:ui-monospace,Menlo,monospace}
+.panel{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:16px;margin:16px 0}
+.breath p{margin:.25em 0}
+.breath .n{color:var(--acc);font-family:ui-monospace,Menlo,monospace;margin-right:8px}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 22px;margin-bottom:12px}
+.ctl label{display:block;font-size:.9rem;color:var(--mut);margin-bottom:4px}
+.ctl label b{color:var(--fg);font-family:ui-monospace,Menlo,monospace}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+button,.seg label{font:inherit;font-size:.9rem;background:#21262d;color:var(--fg);border:1px solid var(--bd);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover,.seg label:hover{border-color:var(--acc)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label.on{background:#10243d;border-color:var(--acc);color:var(--acc)}
+button.pri{background:#1f6feb;border-color:#1f6feb}
+button:disabled{opacity:.4;cursor:default}
+svg{width:100%;min-width:560px;height:auto;display:block}.panel{overflow-x:auto}
+svg text{font-family:ui-monospace,Menlo,monospace;fill:var(--fg)}
+.res{border-left:4px solid var(--bd);padding:8px 12px;margin-top:10px;background:#0d1117;border-radius:0 8px 8px 0}
+.res.ok{border-color:var(--ok)}.res.bad{border-color:var(--bad)}.res.warn{border-color:var(--warn)}
+.opts{display:grid;gap:10px}
+.opt{border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:#0d1117;opacity:.6}
+.opt.on{opacity:1;border-color:var(--acc);background:#10243d}
+.opt h3{margin:0 0 4px;font-size:.98rem}
+.opt p{margin:0;font-size:.93rem;color:#c9d1d9}
+.pill{display:inline-block;font-size:.72rem;padding:1px 8px;border-radius:99px;border:1px solid var(--bd);color:var(--mut);margin-left:6px;font-family:ui-monospace,Menlo,monospace}
+.pill.prop{border-color:var(--ok);color:var(--ok)}
+.back{display:inline-block;margin-top:10px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--mut);margin-top:8px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+@media(max-width:520px){h1{font-size:1.4rem}.panel{padding:12px}}
+</style></head><body>
+<div class="wrap">
+<div class="tag">Decision D1 · #1678 / #1645 · iteration reserve</div>
+<h1>The agent hits its cap with edits not committed</h1>
+<div class="panel breath"><h2>The problem in one breath</h2>
+<p><span class="n">1</span>The agent loop has a cap, like 50 iterations. At the cap the run stops.</p>
+<p><span class="n">2</span>If the model just edited a file at 50, it still needs a retest and a commit. That is 2 more steps.</p>
+<p><span class="n">3</span>Today it dies at 51 with uncommitted edits. The "reserve of 3" in the PR is really 1.</p></div>
+
+<div class="panel"><h2>Drive it</h2>
+<div class="ctl">
+<div><label>Iteration cap: <b id="capv"></b></label><input type="range" id="cap" min="5" max="100" value="50"></div>
+<div><label>Steps the model needs (last one is the commit): <b id="needv"></b></label><input type="range" id="need" min="3" max="110" value="52"></div>
+<div><label>Policy</label><div class="seg" id="pol">
+<label><input type="radio" name="p" value="today" checked>Today: no reserve</label>
+<label><input type="radio" name="p" value="r1">Reserve of 1</label>
+<label><input type="radio" name="p" value="r3">Reserve of 3</label></div></div>
+<div><label>Run</label><div class="seg"><button class="pri" id="play">Play</button><button id="reset">Reset</button></div></div>
+</div>
+<svg id="svg" viewBox="0 0 900 170" role="img" aria-label="iteration timeline"></svg>
+<div class="legend"><span><i style="background:#1f4f8f"></i>normal iteration</span><span><i style="background:var(--warn)"></i>reserve iteration</span><span><i style="background:#21262d;border:1px solid var(--bd)"></i>not allowed</span><span><i style="background:var(--ok)"></i>edit / retest / commit</span><span><i style="background:var(--bad)"></i>run dies</span></div>
+<div id="res" class="res"></div></div>
+
+<div class="panel"><h2>What each option does</h2><div class="opts">
+<div class="opt" data-k="r3"><h3>Reserve of 3, kept across passes<span class="pill prop">proposed</span></h3><p>The cap becomes cap + 3. A retest and a commit fit. Needs a test that really runs past the cap.</p></div>
+<div class="opt" data-k="r1"><h3>Exactly 1 extra iteration</h3><p>This is what the code does now, because <code>limit</code> is re-read each pass. Only one step is granted. Fix the notice text to say 1. A retest plus commit (2 steps) still does not fit.</p></div>
+<div class="opt" data-k="today"><h3>Drop the reserve</h3><p>The cap is the cap. The run dies the moment the cap is used, even in the middle of an edit.</p></div>
+</div><a class="back" href="index.html">&larr; Back to decisions</a></div>
+</div>
+<script>
+function $(i){return document.getElementById(i)}
+function seg(id,cb){var el=$(id);function sync(){[].forEach.call(el.querySelectorAll('label'),function(l){l.classList.toggle('on',l.querySelector('input').checked)})}
+el.addEventListener('change',function(){sync();cb()});sync();}
+function val(id){var c=document.querySelector('#'+id+' input:checked');return c?c.value:''}
+function S(n,a,t){var e=document.createElementNS('http://www.w3.org/2000/svg',n);for(var k in a)e.setAttribute(k,a[k]);if(t!=null)e.textContent=t;return e}
+function setOn(prefix,key){[].forEach.call(document.querySelectorAll('.opt[data-k]'),function(o){o.classList.toggle('on',o.getAttribute('data-k')===key)})}
+var C,N,extra,limit,end,pos=0,timer=null;
+var EX={today:0,r1:1,r3:3};
+function calc(){C=+$('cap').value;N=+$('need').value;extra=EX[val('pol')];limit=C+extra;end=Math.min(N,limit);
+$('capv').textContent=C;$('needv').textContent=N;}
+function draw(){var svg=$('svg');svg.innerHTML='';var total=Math.max(N,C+3)+1;var W=880,x0=10,cw=W/total,y=40,h=44;
+for(var i=1;i<=total;i++){var fill=i<=C?'#1f4f8f':(i<=limit?'#d29922':'#21262d');
+var x=x0+(i-1)*cw;if(i>pos&&pos>0||pos===0&&false){}
+var r=S('rect',{x:x+.5,y:y,width:Math.max(cw-1,1),height:h,fill:fill,opacity:(pos>0&&i>pos)?.35:1});svg.appendChild(r);}
+function mark(i,l,c){if(i<1)return;var x=x0+(i-1)*cw;svg.appendChild(S('rect',{x:x+.5,y:y,width:Math.max(cw-1,1),height:h,fill:c,opacity:(pos>0&&i>pos)?.35:1}));
+svg.appendChild(S('text',{x:x+cw/2,y:y+h+16,'text-anchor':'middle','font-size':11},l));}
+if(N-2<=Math.min(total,limit)||true){mark(N-2,'E','#3fb950');mark(N-1,'T','#3fb950');mark(N,'C','#3fb950');}
+// cap line
+var cx=x0+C*cw;svg.appendChild(S('line',{x1:cx,x2:cx,y1:y-14,y2:y+h+4,stroke:'#8b949e','stroke-dasharray':'3 3'}));
+svg.appendChild(S('text',{x:Math.min(cx,W-40),y:y-20,'text-anchor':'middle','font-size':12},'cap '+C));
+var lx=x0+limit*cw;if(extra>0){svg.appendChild(S('text',{x:Math.min(lx,W-30),y:y+h+34,'text-anchor':'middle','font-size':12,fill:'#d29922'},'limit '+limit));
+svg.lastChild.setAttribute('style','fill:#d29922')}
+var cur=pos>0?pos:0;if(cur>0){var px=x0+(cur-.5)*cw;svg.appendChild(S('path',{d:'M'+px+' '+(y-2)+' l-6 -12 l12 0z',fill:'#58a6ff'}));}
+if(pos>=end&&pos>0&&N>limit){var dx=x0+(end-.5)*cw;svg.appendChild(S('circle',{cx:dx,cy:y+h/2,r:9,fill:'#f85149'}));svg.appendChild(S('text',{x:dx,y:y+h/2+4,'text-anchor':'middle','font-size':12,style:'fill:#fff'},'x'));}
+svg.appendChild(S('text',{x:10,y:150,'font-size':12,style:'fill:#8b949e'},'E = last edit  T = retest  C = commit   (iteration 1 ... '+total+')'));}
+function result(){var r=$('res'),e=N-2,t;
+var showFinal=pos>=end||pos===0;
+if(N<=limit){r.className='res ok';t='Commit lands at iteration '+N+'. Limit is '+limit+'. Work is saved.';}
+else if(e<=limit){r.className='res bad';t='Run dies at iteration '+limit+' (limit '+limit+'). The edit at '+e+' is done'+(limit>=N-1?', the retest ran,':', no retest,')+' and the commit at '+N+' never runs. Edits stay uncommitted.';}
+else{r.className='res warn';t='Run dies at iteration '+limit+', before the last edit at '+e+'. Nothing half-done, but the task is unfinished.';}
+if(pos>0&&pos<end&&!showFinal)t='Running... iteration '+pos+' of '+end+'.';
+r.textContent=t;
+setOn('', val('pol'));}
+function upd(){calc();draw();result();}
+function stop(){if(timer){clearInterval(timer);timer=null;$('play').textContent='Play'}}
+$('play').onclick=function(){if(timer){stop();return}calc();if(pos>=end)pos=0;$('play').textContent='Pause';var step=Math.max(30,Math.min(120,3000/end));timer=setInterval(function(){pos++;draw();result();if(pos>=end)stop();},step)};
+$('reset').onclick=function(){stop();pos=0;upd()};
+$('cap').oninput=$('need').oninput=function(){stop();pos=0;upd()};
+seg('pol',function(){stop();pos=0;upd()});upd();
+</script></body></html>
