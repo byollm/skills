@@ -113,6 +113,71 @@
   .graphic { background: #0b1016; border: 1px solid #222a33; border-radius: 6px; padding: 10px; margin: 6px 0 4px; }
   .graphic svg { width: 100%; height: auto; display: block; }
   .graphic .cap { font-size: 12px; color: var(--dim); margin-top: 6px; }
+
+  /* document tab: editable paragraphs */
+  .doc p[contenteditable] { border: 1px dashed transparent; border-radius: 6px;
+    padding: 6px 10px; margin: 10px 0; outline: none; }
+  .doc p[contenteditable]:hover { border-color: var(--line); }
+  .doc p[contenteditable]:focus { border-color: var(--accent); background: #0d1420; }
+  .doc p.edited { border-style: solid; border-color: #9e6a03; }
+  .doc .editflag { font-size: 10.5px; font-family: var(--mono); color: var(--warn);
+    margin-left: 8px; user-select: none; }
+  .doc h2.docsec { margin-top: 28px; }
+
+  /* graphic comments */
+  .gcomments { margin-top: 8px; }
+  .gcomment { font-size: 12.5px; margin-bottom: 6px; padding-bottom: 6px;
+    border-bottom: 1px dashed var(--line); }
+  .gcomment .who { color: var(--accent); font-weight: 600; }
+  .gcform { display: flex; gap: 6px; margin-top: 6px; }
+  .gcform input, .gcform textarea { background: var(--bg); border: 1px solid var(--line);
+    border-radius: 6px; color: var(--text); padding: 5px 9px; font-size: 12.5px; }
+  .gcform input { width: 100px; }
+  .gcform textarea { flex: 1; min-height: 30px; resize: vertical; font-family: inherit; }
+
+  /* assistant tab: chat panel */
+  .chatwrap { display: flex; flex-direction: column; height: calc(100vh - 240px);
+    min-height: 420px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); overflow: hidden; }
+  #chatlog { flex: 1; overflow-y: auto; padding: 16px; display: flex;
+    flex-direction: column; gap: 10px; }
+  .msg { max-width: 86%; border-radius: 10px; padding: 10px 14px; font-size: 13.5px;
+    white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: #1f3a5f; border: 1px solid #264f7d; }
+  .msg.assistant { align-self: flex-start; background: var(--panel2); border: 1px solid var(--line); }
+  .msg.assistant .act { display: block; margin-top: 8px; font-size: 12px; font-family: var(--mono);
+    color: var(--ok); border-top: 1px dashed var(--line); padding-top: 6px; }
+  .msg.error { align-self: stretch; background: #2d1416; border: 1px solid #67060c; color: #ffa198; }
+  .chatbar { display: flex; gap: 8px; border-top: 1px solid var(--line); padding: 10px;
+    background: var(--panel2); }
+  .chatbar textarea { flex: 1; min-height: 44px; max-height: 140px; resize: none;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--text); padding: 10px 12px; font: 13.5px/1.4 inherit; }
+  .chatbar textarea:focus { outline: none; border-color: var(--accent); }
+  .chatcfg { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel2);
+    font-size: 12.5px; color: var(--dim); }
+  .chatcfg input { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--text); padding: 5px 9px; font: 12px var(--mono); }
+  .chatcfg .url { width: 300px; } .chatcfg .model { width: 150px; }
+  .chatcfg .st { font-family: var(--mono); font-size: 11.5px; }
+  .chatcfg .st.ok { color: var(--ok); } .chatcfg .st.bad { color: var(--bad); }
+
+  /* publish tab */
+  .pubcfg { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); font-size: 12.5px; color: var(--dim); margin-bottom: 16px; }
+  .pubcfg input { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--text); padding: 5px 9px; font: 12px var(--mono); }
+  .pubcfg .tok { width: 220px; } .pubcfg .repo { width: 200px; } .pubcfg .br { width: 110px; }
+  .pubcfg .st { font-family: var(--mono); font-size: 11.5px; }
+  .pubcfg .st.ok { color: var(--ok); } .pubcfg .st.bad { color: var(--bad); }
+  .pubactions { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+  .pubresult { border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+    padding: 12px 16px; font-size: 13.5px; margin-top: 10px; }
+  .pubresult a { color: var(--accent); }
+  .pubresult.ok { border-color: #238636; }
+  .pubresult.bad { border-color: #67060c; color: #ffa198; }
 </style>
 </head>
 <body>
@@ -123,7 +188,10 @@
 </header>
 <nav>
   <a data-tab="decisions" class="active">Decisions</a>
+  <a data-tab="document">Document</a>
   <a data-tab="mockups">Mockups</a>
+  <a data-tab="assistant">Assistant</a>
+  <a data-tab="publish">Publish</a>
   <a data-tab="prompt">Generate prompt</a>
 </nav>
 <main>
@@ -140,11 +208,70 @@
     </div>
   </section>
 
+  <section id="document">
+    <h2>Document — editable</h2>
+    <p class="note" style="margin-bottom:18px">The source document, paragraph by paragraph.
+      Click any paragraph to edit it — edits are saved as you type and marked
+      <span style="color:var(--warn)">edited</span>. Edited paragraphs flow into the
+      generated prompt as DOCUMENT EDITS. <span id="docProgress"></span></p>
+    <div class="doc" id="doc"></div>
+  </section>
+
   <section id="mockups">
     <h2>Mockups</h2>
     <p class="note" style="margin-bottom:18px">Review each screen, leave comments, and toggle
       which mocks are included in the generated prompt. <span id="mockProgress"></span></p>
     <div id="mocks"></div>
+  </section>
+
+  <section id="assistant">
+    <h2>Assistant</h2>
+    <p class="note">Chat with a local model about this session. The model can read the
+      whole page state and act on it: decide, select mocks, edit document paragraphs,
+      or comment — via <code>[ACT]</code> action lines in its replies.</p>
+    <div class="chatwrap">
+      <div class="chatcfg">
+        <label>API <input class="url" id="chatUrl" placeholder="http://localhost:8000/v1"
+          oninput="chatCfg('url', this.value)"></label>
+        <label>Model <input class="model" id="chatModel" placeholder="qwen"
+          oninput="chatCfg('model', this.value)"></label>
+        <button class="btn" style="padding:5px 12px" onclick="chatDetect()">Detect</button>
+        <button class="btn" style="padding:5px 12px" onclick="chatPing()">Test</button>
+        <span class="st" id="chatSt">not connected</span>
+      </div>
+      <div id="chatlog"></div>
+      <div class="chatbar">
+        <textarea id="chatIn" placeholder="Ask about a decision, or: decide G1 option 2…"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}"></textarea>
+        <button class="btn primary" onclick="chatSend()">Send</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="publish">
+    <h2>Publish to GitHub</h2>
+    <p class="note">File the outcome as an issue, or open a PR with the updated
+      site + a <code>decisions.md</code> export. Needs a fine-grained PAT with
+      Contents + Pull requests + Issues RW on the target repo. The token is
+      kept for this browser session only and never leaves the page except to
+      api.github.com.</p>
+    <div class="pubcfg">
+      <label>Token <input class="tok" id="ghTok" type="password"
+        placeholder="github_pat_…" oninput="ghTokInput(this.value)"></label>
+      <label>Repo <input class="repo" id="ghRepo" placeholder="owner/name"
+        oninput="ghCfg('repo', this.value)"></label>
+      <label>Base <input class="br" id="ghBranch" placeholder="main"
+        oninput="ghCfg('branch', this.value)"></label>
+      <button class="btn" style="padding:5px 12px" onclick="ghTest()">Test</button>
+      <button class="btn" style="padding:5px 12px" onclick="ghForget()">Forget token</button>
+      <span class="st" id="ghSt">not connected</span>
+    </div>
+    <div class="pubactions">
+      <button class="btn primary" onclick="publishIssue()">File issue with prompt</button>
+      <button class="btn primary" onclick="publishPR()">Open PR with updated site</button>
+      <button class="btn" onclick="copyPromptBody()">Copy prompt (offline)</button>
+    </div>
+    <div id="pubOut"></div>
   </section>
 
   <section id="prompt">
@@ -180,6 +307,7 @@
    ====================================================================== */
 const DECISIONS = [];
 const MOCKS = [];
+const DOC = [];   // { id, section, html } — source doc split into paragraphs
 const FACTS = [];
 const SCOPE = [];
 const CONSTRAINTS = [];
@@ -194,19 +322,34 @@ let freeform = {};   // decision id -> freeform text
 let comments = {};   // mock id -> [{who, text, when}]
 let drafts = {};     // mock id -> {who, text} unsubmitted comment drafts
 let mockSel = {};    // mock id -> selected bool (overrides MOCKS default)
+let docEdits = {};   // DOC paragraph id -> edited HTML (contenteditable)
+let gcomments = {};  // decision id -> [{who, text, when}] comments on the deep-dive graphic
+let gdrafts = {};    // decision id -> {who, text} unsubmitted graphic-comment drafts
+let chat = { url: "", model: "", log: [] };  // assistant config + transcript
 
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
     state = s.state || {}; freeform = s.freeform || {};
     comments = s.comments || {}; drafts = s.drafts || {};
-    mockSel = s.mockSel || {};
+    mockSel = s.mockSel || {}; docEdits = s.docEdits || {};
+    gcomments = s.gcomments || {}; gdrafts = s.gdrafts || {}; chat = Object.assign(chat, s.chat || {});
+    gh = Object.assign(gh, s.gh || {});
+    if (!s.state && typeof window !== "undefined" && window.BAKED_STATE) {
+      // Fresh browser + serialized site from a PR: seed from the baked state.
+      const b = window.BAKED_STATE;
+      state = b.state || {}; freeform = b.freeform || {}; comments = b.comments || {};
+      drafts = b.drafts || {}; mockSel = b.mockSel || {}; docEdits = b.docEdits || {};
+      gcomments = b.gcomments || {}; gdrafts = b.gdrafts || {};
+      chat = Object.assign(chat, b.chat || {});
+    }
   } catch (e) { /* fresh */ }
 }
 function saveState() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(
-      { state, freeform, comments, drafts, mockSel }));
+      { state, freeform, comments, drafts, mockSel, docEdits, gcomments, gdrafts, chat,
+        gh: { repo: gh.repo, branch: gh.branch } }));
   } catch (e) { /* private mode etc. */ }
 }
 
@@ -259,9 +402,36 @@ function renderDive(d) {
       <div class="note">● strong · ◐ partial · ○ weak</div>`;
   }
   const graphic = v.graphic && v.graphic.svg ? `<h4>Graphic</h4><div class="graphic">${v.graphic.svg}
-      ${v.graphic.caption ? `<div class="cap">${esc(v.graphic.caption)}</div>` : ""}</div>` : "";
+      ${v.graphic.caption ? `<div class="cap">${esc(v.graphic.caption)}</div>` : ""}</div>
+      ${renderGComments(d.id)}` : "";
   return `<details class="dive" open><summary>Deep dive: problem, examples, pro/con matrix, graphic</summary>
     ${problem}${examples}${matrix}${graphic}</details>`;
+}
+
+/* Comments on a decision's deep-dive graphic. Included in the prompt. */
+function renderGComments(id) {
+  const dr = gdrafts[id] || {};
+  const cs = (gcomments[id] || []).map(c =>
+    `<div class="gcomment"><span class="who">${esc(c.who)}</span>
+      <span class="when" style="color:var(--dim);font-size:11px;font-family:var(--mono);margin-left:6px">${esc(c.when)}</span><br>${esc(c.text)}</div>`).join("");
+  return `<div class="gcomments">${cs}
+    <div class="gcform">
+      <input id="gname-${id}" placeholder="name" value="${esc(dr.who || "")}" oninput="gDraftInput('${id}','who',this.value)">
+      <textarea id="gtext-${id}" placeholder="Comment on this graphic…"
+        oninput="gDraftInput('${id}','text',this.value)">${esc(dr.text || "")}</textarea>
+      <button class="btn" style="padding:5px 12px" onclick="addGComment('${id}')">Comment</button>
+    </div></div>`;
+}
+function gDraftInput(id, field, v) {
+  (gdrafts[id] = gdrafts[id] || {})[field] = v; saveState();
+}
+function addGComment(id) {
+  const who = (document.getElementById("gname-" + id).value || "").trim() || "anon";
+  const text = (document.getElementById("gtext-" + id).value || "").trim();
+  if (!text) return;
+  (gcomments[id] = gcomments[id] || []).push({ who, text, when: new Date().toLocaleString() });
+  delete gdrafts[id];
+  saveState(); render();
 }
 
 /* Returns a list of problems; empty when every decision has a complete deep dive. */
@@ -286,7 +456,8 @@ function decideFree(id) { state[id] = "free"; saveState(); render();
 function freeInput(id, v) { freeform[id] = v; saveState(); }
 function acceptAllProposed() { DECISIONS.forEach(d => state[d.id] = d.def); saveState(); render(); }
 function resetAll() { state = {}; freeform = {}; comments = {}; drafts = {}; mockSel = {};
-  saveState(); render(); renderMocks(); }
+  docEdits = {}; gcomments = {}; gdrafts = {}; chat.log = [];
+  saveState(); render(); renderMocks(); renderDoc(); renderChat(); }
 
 /* ---------- mockups ---------- */
 function renderMocks() {
@@ -332,6 +503,365 @@ function addComment(id) {
 }
 function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
+/* ---------- document (editable paragraphs) ---------- */
+function renderDoc() {
+  let lastSec = null, out = "";
+  DOC.forEach(p => {
+    if (p.section && p.section !== lastSec) {
+      out += `<h2 class="docsec">${esc(p.section)}</h2>`;
+      lastSec = p.section;
+    }
+    const edited = docEdits[p.id] !== undefined;
+    out += `<p contenteditable="true" id="doc-${p.id}" class="${edited ? "edited" : ""}"
+      oninput="docInput('${p.id}', this.innerHTML)"
+      onblur="docBlur('${p.id}', this)">${edited ? docEdits[p.id] : p.html}</p>`;
+  });
+  document.getElementById("doc").innerHTML = out || "<p class='note'>No document paragraphs.</p>";
+  document.getElementById("docProgress").textContent =
+    `— ${Object.keys(docEdits).length}/${DOC.length} paragraphs edited.`;
+}
+function docInput(id, html) { docEdits[id] = html; saveState(); }
+function docBlur(id, el) {
+  if (el.innerHTML.trim() === (DOC.find(p => p.id === id) || {}).html) {
+    delete docEdits[id]; saveState(); renderDoc();
+  } else el.classList.add("edited");
+}
+function docText(id) {
+  const el = document.getElementById("doc-" + id);
+  const html = docEdits[id] !== undefined ? docEdits[id] : (DOC.find(p => p.id === id) || {}).html;
+  return String(html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/* ---------- assistant (chat with a local model) ---------- */
+/* OpenAI-compatible /chat/completions. Works with vLLM, llama.cpp, LM Studio,
+   Ollama's /v1 endpoint, and GLM local servers. If no server is reachable the
+   panel degrades to a note — the site stays fully functional without it. */
+function chatCfg(k, v) { chat[k] = v; saveState(); }
+function chatSt(msg, cls) {
+  const el = document.getElementById("chatSt");
+  el.textContent = msg; el.className = "st " + (cls || "");
+}
+function renderChat() {
+  const urlEl = document.getElementById("chatUrl");
+  if (urlEl && urlEl.value !== chat.url) urlEl.value = chat.url || "";
+  const mEl = document.getElementById("chatModel");
+  if (mEl && mEl.value !== chat.model) mEl.value = chat.model || "";
+  document.getElementById("chatlog").innerHTML = (chat.log || []).map(m =>
+    `<div class="msg ${m.role}">${esc(m.text)}${(m.acts || []).length ?
+      `<span class="act">✓ ${m.acts.map(esc).join("<br>✓ ")}</span>` : ""}</div>`).join("");
+  const log = document.getElementById("chatlog");
+  log.scrollTop = log.scrollHeight;
+}
+function chatPing() {
+  if (!chat.url) { chatSt("set an API URL first", "bad"); return; }
+  chatSt("testing…");
+  fetch(chat.url.replace(/\/$/, "") + "/models")
+    .then(r => r.ok ? chatSt("connected", "ok") : chatSt("HTTP " + r.status, "bad"))
+    .catch(() => chatSt("unreachable — site works without it", "bad"));
+}
+/* Probe amesh/flocode/common LLM ports from the browser; fill config on hit. */
+function chatDetect() {
+  const bases = ["http://localhost:8000", "http://localhost:8080",
+    "http://localhost:11434", "http://localhost:1234",
+    "http://localhost:56890", "http://localhost:57456",
+    "http://localhost:61353", "http://localhost:6840",
+    "http://localhost:18765", "http://localhost:18766", "http://localhost:17877"];
+  chatSt("detecting…");
+  let pending = bases.length;
+  bases.forEach(b => {
+    fetch(b + "/v1/models", { signal: AbortSignal.timeout ? AbortSignal.timeout(2000) : undefined })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (j && Array.isArray(j.data) && j.data.length) {
+          chat.url = b + "/v1";
+          chat.model = (j.data[0].id || "").replace(/^.*\//, "");
+          saveState(); renderChat();
+          chatSt("found " + chat.model + " @ " + chat.url, "ok");
+          pending = 0; // stop on first hit
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (--pending === 0)
+        chatSt("no server found — paste a URL", "bad"); });
+  });
+}
+function chatSystemPrompt() {
+  const dLines = DECISIONS.map(d =>
+    `- ${d.id}: ${d.q} | options: ${d.opts.join(" / ")} | proposed: ${d.opts[d.def]}` +
+    ` | current: ${decisionValue(d)}`).join("\n");
+  const mLines = MOCKS.map(m =>
+    `- ${m.id}: ${m.title} (${m.screen}) | in prompt: ${mockSelected(m.id)}`).join("\n");
+  const pLines = DOC.map(p => `- ${p.id} [${p.section || "doc"}]: ${docText(p.id).slice(0, 200)}`).join("\n");
+  return `You are the assistant embedded in a decision-review site. You can see and change its state.
+STATE:
+DECISIONS:
+${dLines}
+MOCKUPS:
+${mLines}
+DOCUMENT PARAGRAPHS:
+${pLines}
+
+To change state, end your reply with action lines (one per line, after your prose):
+[ACT] decide <decisionId> <optionIndex>        // 1-based option index
+[ACT] decide-free <decisionId> <freeform text>
+[ACT] select-mock <mockId> <true|false>
+[ACT] edit-doc <paragraphId> <new text>
+[ACT] comment-mock <mockId> <name> <text>
+[ACT] comment-graphic <decisionId> <name> <text>
+Only use ids from the state above. Otherwise just answer in plain prose.`;
+}
+function applyAct(line) {
+  const m = line.match(/^\[ACT\]\s+(\S+)\s+([\s\S]*)$/);
+  if (!m) return null;
+  const cmd = m[1], rest = m[2].trim();
+  const sp = rest.split(" ");
+  if (cmd === "decide") {
+    const d = DECISIONS.find(x => x.id === sp[0]);
+    const i = parseInt(sp[1], 10) - 1;
+    if (!d || isNaN(i) || i < 0 || i >= d.opts.length) return null;
+    state[d.id] = i; saveState(); render();
+    return `decided ${d.id} → ${d.opts[i]}`;
+  }
+  if (cmd === "decide-free") {
+    const d = DECISIONS.find(x => x.id === sp[0]);
+    if (!d) return null;
+    state[d.id] = "free"; freeform[d.id] = rest.slice(sp[0].length).trim();
+    saveState(); render();
+    return `decided ${d.id} → freeform`;
+  }
+  if (cmd === "select-mock") {
+    const mo = MOCKS.find(x => x.id === sp[0]);
+    if (!mo) return null;
+    mockSel[mo.id] = sp[1] !== "false";
+    saveState(); renderMocks();
+    return `${mo.id} ${mockSel[mo.id] ? "included in" : "excluded from"} prompt`;
+  }
+  if (cmd === "edit-doc") {
+    const p = DOC.find(x => x.id === sp[0]);
+    if (!p) return null;
+    docEdits[p.id] = esc(rest.slice(sp[0].length).trim());
+    saveState(); renderDoc();
+    return `edited paragraph ${p.id}`;
+  }
+  if (cmd === "comment-mock") {
+    const mo = MOCKS.find(x => x.id === sp[0]);
+    if (!mo) return null;
+    (comments[mo.id] = comments[mo.id] || []).push(
+      { who: sp[1] || "model", text: rest.split(" ").slice(2).join(" "),
+        when: new Date().toLocaleString() });
+    saveState(); renderMocks();
+    return `commented on ${mo.id}`;
+  }
+  if (cmd === "comment-graphic") {
+    const d = DECISIONS.find(x => x.id === sp[0]);
+    if (!d) return null;
+    (gcomments[d.id] = gcomments[d.id] || []).push(
+      { who: sp[1] || "model", text: rest.split(" ").slice(2).join(" "),
+        when: new Date().toLocaleString() });
+    saveState(); render();
+    return `commented on ${d.id} graphic`;
+  }
+  return null;
+}
+function chatSend() {
+  const el = document.getElementById("chatIn");
+  const text = el.value.trim();
+  if (!text) return;
+  el.value = "";
+  if (!chat.url) {
+    chat.log.push({ role: "user", text });
+    chat.log.push({ role: "error",
+      text: "No API URL set. Enter the model server URL above (e.g. http://localhost:8000/v1) and the model name, then Test. The site works fully without a model." });
+    saveState(); renderChat(); return;
+  }
+  chat.log.push({ role: "user", text });
+  saveState(); renderChat();
+  const body = JSON.stringify({
+    model: chat.model || "local",
+    messages: [{ role: "system", content: chatSystemPrompt() }]
+      .concat((chat.log || []).filter(m => m.role === "user" || m.role === "assistant")
+        .map(m => ({ role: m.role, content: m.text })))
+  });
+  fetch(chat.url.replace(/\/$/, "") + "/chat/completions", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body
+  }).then(r => {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(j => {
+    let text = (j.choices && j.choices[0] && j.choices[0].message &&
+      j.choices[0].message.content) || "(empty reply)";
+    const acts = [];
+    const actLines = text.match(/^\[ACT\].*$/gm) || [];
+    actLines.forEach(l => { const res = applyAct(l); if (res) acts.push(res); });
+    text = text.replace(/^\[ACT\].*$/gm, "").trim();
+    chat.log.push({ role: "assistant", text, acts });
+    saveState(); renderChat();
+  }).catch(e => {
+    chat.log.push({ role: "error", text: "Model unreachable: " + e.message +
+      ". The site keeps working — decisions, comments and the prompt are all local." });
+    saveState(); renderChat();
+  });
+}
+
+/* ---------- publish to GitHub ---------- */
+/* Token: sessionStorage only (per session, never in saveState/serializeSite).
+   Repo/branch: localStorage. All writes behind confirm(). */
+let gh = { repo: "", branch: "" };
+function ghTokInput(v) { try { sessionStorage.setItem("gh-token", v); } catch (e) {} }
+function ghToken() { try { return sessionStorage.getItem("gh-token") || ""; } catch (e) { return ""; } }
+function ghForget() {
+  try { sessionStorage.removeItem("gh-token"); } catch (e) {}
+  document.getElementById("ghTok").value = "";
+  ghSt("token forgotten", "");
+}
+function ghCfg(k, v) { gh[k] = v; saveState(); }
+function ghSt(msg, cls) {
+  const el = document.getElementById("ghSt");
+  el.textContent = msg; el.className = "st " + (cls || "");
+}
+function ghApi(path, opts) {
+  const tok = ghToken();
+  if (!tok) return Promise.reject(new Error("no token"));
+  return fetch("https://api.github.com" + path, Object.assign({
+    headers: {
+      "Authorization": "Bearer " + tok,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    }
+  }, opts || {})).then(r => {
+    if (r.status === 403 || r.status === 429) {
+      const ra = r.headers.get("Retry-After");
+      throw new Error("rate limited" + (ra ? " — retry in " + ra + "s" : ""));
+    }
+    if (!r.ok) return r.json().catch(() => ({})).then(j =>
+      { throw new Error("HTTP " + r.status + (j.message ? ": " + j.message : "")); });
+    return r.status === 204 ? null : r.json();
+  });
+}
+function ghTest() {
+  if (!ghToken()) { ghSt("enter a token first", "bad"); return; }
+  if (!gh.repo) { ghSt("enter owner/name", "bad"); return; }
+  ghSt("testing…");
+  ghApi("/repos/" + gh.repo).then(j => {
+    gh.defaultBranch = j.default_branch;
+    ghSt("ok: " + j.full_name + " (default: " + j.default_branch + ")", "ok");
+  }).catch(e => ghSt(e.message + (String(e.message).includes("404") ?
+    " — repo missing or not in the token's allowlist" : ""), "bad"));
+}
+function pubOut(html, cls) {
+  document.getElementById("pubOut").innerHTML =
+    `<div class="pubresult ${cls || ""}">${html}</div>`;
+}
+function ghConfirm(msg) { return confirm(msg); }
+function ghBaseBranch() { return gh.branch || gh.defaultBranch || "main"; }
+function ghCreateIssue(title, body) {
+  if (body.length > 65000) body = body.slice(0, 65000) + "\n\n(truncated — see decisions.md in the PR)";
+  return ghApi("/repos/" + gh.repo + "/issues", {
+    method: "POST",
+    body: JSON.stringify({ title, body })
+  });
+}
+function ghBranchName() {
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return "decision-site/" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+    "-" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) +
+    "-" + Math.random().toString(36).slice(2, 6);
+}
+function ghCommitFile(branch, path, content, message) {
+  const b64 = btoa(unescape(encodeURIComponent(content)));
+  if (content.length > 1000000) return Promise.reject(
+    new Error(path + " is over 1MB — too large for the Contents API"));
+  const put = sha => ghApi("/repos/" + gh.repo + "/contents/" + path, {
+    method: "PUT",
+    body: JSON.stringify(Object.assign(
+      { message, content: b64, branch }, sha ? { sha } : {}))
+  });
+  return ghApi("/repos/" + gh.repo + "/contents/" + path + "?ref=" + branch)
+    .then(j => put(j.sha)).catch(e => {
+      if (String(e.message).includes("404")) return put(null); // new file
+      throw e;
+    });
+}
+function ghEnsureBranch() {
+  const base = ghBaseBranch(), branch = ghBranchName();
+  return ghApi("/repos/" + gh.repo + "/git/ref/heads/" + base).then(ref => {
+    if (!ref.object) throw new Error("base branch " + base + " not found");
+    return ghApi("/repos/" + gh.repo + "/git/refs", {
+      method: "POST",
+      body: JSON.stringify({ ref: "refs/heads/" + branch, sha: ref.object.sha })
+    }).then(() => branch);
+  }).catch(e => {
+    // Empty repo (no base ref) or collision: reuse the branch if it exists.
+    if (String(e.message).includes("404") && !gh.branch && gh.defaultBranch === undefined)
+      throw new Error("repository is empty — publish needs at least one commit on the base branch");
+    return ghApi("/repos/" + gh.repo + "/git/ref/heads/" + branch)
+      .then(() => branch)
+      .catch(() => { throw e; });
+  });
+}
+function ghOpenPR(head, title, body) {
+  if (body.length > 65000) body = body.slice(0, 65000) + "\n\n(truncated)";
+  return ghApi("/repos/" + gh.repo + "/pulls", {
+    method: "POST",
+    body: JSON.stringify({ title, body, head, base: ghBaseBranch() })
+  });
+}
+function serializeSite() {
+  // Snapshot the live state, clear runtime DOM, inject a baked-state script,
+  // return the full document HTML. Token never included (sessionStorage only).
+  const snapshot = { state, freeform, comments, drafts, mockSel,
+    docEdits, gcomments, gdrafts, chat: { url: chat.url, model: chat.model, log: [] } };
+  const clone = document.documentElement.cloneNode(true);
+  ["cards", "mocks", "doc", "chatlog", "pubOut", "out", "diveWarn"].forEach(id => {
+    const el = clone.querySelector("#" + id); if (el) el.innerHTML = "";
+  });
+  clone.querySelectorAll("input,textarea").forEach(el => { el.value = ""; el.textContent = ""; });
+  const old = clone.querySelector("#baked-state"); if (old) old.remove();
+  const s = document.createElement("script");
+  s.id = "baked-state";
+  s.textContent = "window.BAKED_STATE=" + JSON.stringify(snapshot) + ";";
+  (clone.querySelector("body") || clone).appendChild(s);
+  return "<!DOCTYPE html>\n" + clone.outerHTML;
+}
+function exportMarkdown() {
+  genPrompt();
+  return document.getElementById("out").value;
+}
+function publishIssue() {
+  if (!ghToken() || !gh.repo) { copyPromptBody(); return; }
+  const body = exportMarkdown();
+  const title = (TASK || "Decision session outcome") + " — " + (SOURCE_DOC || "decisions");
+  if (!ghConfirm("File issue on " + gh.repo + "?\n\nTitle: " + title)) return;
+  pubOut("Filing issue…");
+  ghCreateIssue(title, body).then(j =>
+    pubOut("Issue filed: <a href=\"" + esc(j.html_url) + "\" target=\"_blank\">" + esc(j.html_url) + "</a>", "ok")
+  ).catch(e => pubOut(esc(e.message), "bad"));
+}
+function publishPR() {
+  if (!ghToken() || !gh.repo) { copyPromptBody(); return; }
+  const html = serializeSite(), md = exportMarkdown();
+  const title = (TASK || "Decision session outcome") + " — " + (SOURCE_DOC || "decisions");
+  if (!ghConfirm("Open PR on " + gh.repo + " against " + ghBaseBranch() +
+    "?\n\nCommits: index.html (updated site) + decisions.md\n\nTitle: " + title)) return;
+  pubOut("Creating branch…");
+  let branch;
+  ghEnsureBranch()
+    .then(b => { branch = b; pubOut("Committing index.html…");
+      return ghCommitFile(branch, "index.html", html, "decision-site: updated site"); })
+    .then(() => { pubOut("Committing decisions.md…");
+      return ghCommitFile(branch, "decisions.md", md, "decision-site: decisions export"); })
+    .then(() => { pubOut("Opening PR…");
+      return ghOpenPR(branch, title, md); })
+    .then(j => pubOut("PR opened: <a href=\"" + esc(j.html_url) + "\" target=\"_blank\">" +
+      esc(j.html_url) + "</a>", "ok"))
+    .catch(e => pubOut(esc(e.message), "bad"));
+}
+function copyPromptBody() {
+  exportMarkdown();
+  copyPrompt();
+  pubOut("No token/repo set — prompt generated and copied to clipboard instead.", "");
+}
+
 /* ---------- prompt ---------- */
 function decisionValue(d) {
   const chosen = state[d.id];
@@ -373,6 +903,25 @@ function genPrompt() {
     if (row && (row.cons || []).length) L.push(`  accepts: ${row.cons.join("; ")}`);
   });
   L.push("");
+  const gIds = Object.keys(gcomments).filter(k => (gcomments[k] || []).length);
+  if (gIds.length) {
+    L.push("GRAPHIC COMMENTS (on deep-dive graphics):");
+    gIds.forEach(k => {
+      const d = DECISIONS.find(x => x.id === k);
+      L.push(`- ${k}${d ? " (" + d.q + ")" : ""}:`);
+      gcomments[k].forEach(c => L.push(`  - ${c.who}: ${c.text}`));
+    });
+    L.push("");
+  }
+  const eIds = Object.keys(docEdits);
+  if (eIds.length) {
+    L.push("DOCUMENT EDITS (operator-edited paragraphs — apply to the source doc):");
+    eIds.forEach(id => {
+      const p = DOC.find(x => x.id === id);
+      L.push(`- ${id}${p && p.section ? " [" + p.section + "]" : ""}: ${docText(id)}`);
+    });
+    L.push("");
+  }
   if (sel.length) {
     L.push("MOCKUPS TO BUILD (selected):");
     sel.forEach(m => {
@@ -408,6 +957,14 @@ document.querySelectorAll("nav a").forEach(a => {
 loadState();
 render();
 renderMocks();
+renderDoc();
+renderChat();
+(function initPublish() {
+  document.getElementById("ghRepo").value = gh.repo || "";
+  document.getElementById("ghBranch").value = gh.branch || "";
+  const tok = ghToken();
+  if (tok) document.getElementById("ghTok").value = tok;
+})();
 (function warnIncompleteDives() {
   const errs = validateDecisions();
   if (!errs.length) return;

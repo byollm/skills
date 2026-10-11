@@ -23,7 +23,7 @@ dependencies, works from `file://`). Structure:
 <output>/index.html
 ```
 
-The file contains three sections behind a sticky nav:
+The file contains six sections behind a sticky nav:
 
 1. **Decisions** — one card per open decision. Each card shows the question,
    the options (the PRD's proposed default is tagged "proposed"), an
@@ -34,27 +34,60 @@ The file contains three sections behind a sticky nav:
    default in the prompt (flagged in the NOTE line).
    **Every card ALWAYS carries a deep dive** (see "Deep dive" below): the
    problem with real code references, at least two before/after examples,
-   a pro/con matrix over every option, and an inline SVG graphic.
-2. **Mockups** — one mock per flow/screen in the source doc. Each mock is a
+   a pro/con matrix over every option, and an inline SVG graphic — plus a
+   **comment thread on the graphic** (name + text, timestamped, persisted,
+   included in the generated prompt under GRAPHIC COMMENTS).
+2. **Document** — the source doc split into paragraphs, grouped by section.
+   Every paragraph is `contenteditable`: click to edit, saved on every
+   keystroke, marked `edited` when it differs from the original. Edited
+   paragraphs flow into the generated prompt as DOCUMENT EDITS. Reverting a
+   paragraph back to the original text clears the flag.
+3. **Mockups** — one mock per flow/screen in the source doc. Each mock is a
    card with a title bar (file/screen it belongs to), a visual rendering of
    the screen, and a **comment box** (name + text, appends timestamped
    comments below the mock). Mockups have a **select for prompt** toggle:
    the generated prompt only includes the selected mocks (all selected by
    default). Submitted comments on selected mocks are included in the prompt
    as indented bullets under the mock.
-3. **Prompt** — a button that generates the prompt via JavaScript from the
+4. **Assistant** — an embedded chat panel wired to a local LLM via the
+   OpenAI-compatible `/v1/chat/completions` API (works with vLLM, llama.cpp,
+   LM Studio, Ollama's `/v1`, and GLM local servers). The model receives the
+   full page state (decisions, options, current values, mocks, doc paragraphs)
+   as its system prompt and can CHANGE the page via `[ACT]` action lines:
+   `decide <id> <n>`, `decide-free <id> <text>`, `select-mock <id> <bool>`,
+   `edit-doc <id> <text>`, `comment-mock <id> <name> <text>`,
+   `comment-graphic <id> <name> <text>`. Applied actions are shown as green
+   ✓ lines under the reply and mutate the live DOM/state like a user click.
+   **When the skill is first initialized, ask the operator which model server
+   to wire in** (e.g. the local qwen or GLM server: URL + model name) and bake
+   the defaults into the site's chat config. If no server is reachable, the
+   panel degrades to a clear note — the site stays fully functional without
+   a model.
+5. **Publish** — file the outcome straight to GitHub from the browser:
+   **File issue** posts the generated prompt as an issue; **Open PR** creates a
+   branch `decision-site/<timestamp>`, commits the serialized site (state baked
+   in via `window.BAKED_STATE`) plus a `decisions.md` export, and opens a PR
+   with the prompt as the body. Config: fine-grained PAT (Contents + Pull
+   requests + Issues RW on the target repo), repo, base branch. The token is
+   kept in `sessionStorage` only — per session, never in `saveState()` or the
+   serialized site, with a "Forget token" button. No token → buttons degrade
+   to Copy. All writes behind a confirmation dialog. Note for the operator:
+   org repos may require org approval of fine-grained PATs, and a 404 on Test
+   usually means the repo is not in the token's allowlist.
+6. **Prompt** — a button that generates the prompt via JavaScript from the
    current state: verified facts (if the source doc has them), every decision
-   (decided value, freeform text, or "OPEN — use proposed default"), the
-   selected mockups with their comments, scope, and constraints. Output is a
-   textarea with a Copy button. The prompt must be concise — decisions as
-   one-liners, comments as bullets, no prose padding.
+   (decided value, freeform text, or "OPEN — use proposed default"), graphic
+   comments, document edits, the selected mockups with their comments, scope,
+   and constraints. Output is a textarea with a Copy button. The prompt must
+   be concise — decisions as one-liners, comments as bullets, no prose padding.
 
 **Persistence (required).** All state — decisions, freeform text, submitted
-comments, unsubmitted comment drafts, and mock selection — is saved to
+comments, unsubmitted comment drafts, graphic comments and drafts, document
+edits, mock selection, and the chat config + transcript — is saved to
 `localStorage` on every change and restored on load. Nothing is lost when
 navigating between tabs, re-rendering, or reloading the page. Unsubmitted
-drafts survive re-renders because `renderMocks()` restores draft values into
-the form inputs. Key: `decision-site:<SOURCE_DOC>`.
+drafts survive re-renders because the render functions restore draft values
+into the form inputs. Key: `decision-site:<SOURCE_DOC>`.
 
 ## Deep dive (required on every decision)
 
@@ -128,6 +161,34 @@ Read the source doc (usually a PRD) and extract:
   real example data from the doc.
 - **Scope/constraints**: security must-holds, patterns to follow, versioning
   rules.
+- **Document paragraphs**: split the source doc into paragraphs
+  (`DOC: [{id, section, html}]`) so the operator can edit them in place.
+
+**Model wiring (autodetect, then ask).** When the skill is first initialized,
+do not make the operator type a URL. Probe first, then suggest:
+
+1. **amesh**: check `AMESH_DAEMON_URL` in the environment; if unset, try
+   `http://localhost:18765`, `http://localhost:18766`, `http://localhost:17877`
+   (typical amesh web/worker/local ports). An amesh daemon may expose or know
+   about model runtimes — query its inventory if reachable.
+2. **flocode**: check for a running flocode session (`flocode` process, or its
+   local state dir) and any LLM endpoints it advertises.
+3. **Common local LLM servers**: `curl -s -m 2 <url>/v1/models` against
+   `http://localhost:8000` (vLLM/GLM), `:8080`, `:11434` (Ollama),
+   `:1234` (LM Studio), `:56890`/`:57456`/`:61353`/`:6840` (common
+   ephemeral node-server ports). A 200 with a JSON model list = found.
+4. Also run `lsof -iTCP -sTCP:LISTEN -P` and probe any listener that answers
+   `/v1/models` with JSON.
+
+Then ask the operator: "Found these model servers: <list with model names>.
+Wire one into the Assistant tab? (or paste another URL)". Bake the chosen
+URL + model name into the site's chat config defaults. If nothing is found
+or the operator declines, that is fine — the panel shows a clear note and
+everything else works.
+
+The generated site also has a **Detect** button in the Assistant tab that
+re-runs this probe from the browser (same candidate list) and fills the
+config — so the operator can wire a server in later without regenerating.
 
 If the source doc lacks any of these, generate sensible ones from its content
 and note it in the site header.
@@ -173,6 +234,17 @@ CONSTRAINTS: ...
 DELIVERABLES: ...
 NOTE: n decision(s) still open (...). Proposed defaults used; flag in review.
 ```
+
+## Writing style (anti-slop)
+
+All prose the skill generates — dive problems, examples, captions, mockup
+copy, the generated prompt — must read like a person wrote it. Banned:
+delve, tapestry, pivotal, crucial, leverage, seamless, robust, testament,
+underscore, moreover, furthermore, "It's worth noting", "At its core",
+"Not X, but Y" parallel negation, tricolons, em-dash pileups, uniform
+sentence length, hedging stacks. Prefer short direct sentences, concrete
+numbers and file paths, and varied rhythm. If a sentence could appear in any
+AI-generated doc, rewrite it.
 
 ## Non-goals
 
